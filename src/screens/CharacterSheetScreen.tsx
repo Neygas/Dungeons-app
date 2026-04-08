@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useCharacterStore } from '@/store/characterStore'
 import { useAuthStore } from '@/store/authStore'
@@ -12,19 +12,43 @@ import SpellsSection from '@/components/character/SpellsSection'
 import WeaponsSection from '@/components/character/WeaponsSection'
 import ArmorSection from '@/components/character/ArmorSection'
 import InventorySection from '@/components/character/InventorySection'
+import InfoSheet from '@/components/character/InfoSheet'
 import BottomSheet from '@/components/shared/BottomSheet'
 import Toast from '@/components/shared/Toast'
 import { CLASSES, XP_TABLE } from '@/data'
 
-const NAV_TABS = ['Stats', 'Spells', 'Combat', 'Gear']
+const NAV_TABS = ['Stats', 'Spells', 'Combat', 'Gear', 'Info']
 const SECTION_IDS = ['section-stats', 'section-spells', 'section-combat', 'section-gear']
+
+// ── Photo modal ────────────────────────────────────────────────────────────────
+function PhotoModal({ current, onSave, onClose }: { current: string; onSave: (url: string) => void; onClose: () => void }) {
+  const [val, setVal] = useState(current ?? '')
+  return (
+    <div onClick={e => { if (e.target === e.currentTarget) onClose() }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+      <div style={{ background: 'var(--white)', borderRadius: 10, width: '100%', maxWidth: 380, padding: 20 }}>
+        <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>Character Photo</div>
+        {val && <img src={val} alt="" style={{ width: 80, height: 80, borderRadius: 6, objectFit: 'cover', display: 'block', margin: '0 auto 12px', border: '2px solid var(--border)' }} onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />}
+        <input value={val} onChange={e => setVal(e.target.value)} placeholder="Paste image URL..." style={{ display: 'block', width: '100%', border: '1px solid var(--border2)', padding: '8px 10px', fontSize: 14, fontFamily: 'inherit', borderRadius: 3, outline: 'none', marginBottom: 10, color: 'var(--text)', background: 'var(--white)', boxSizing: 'border-box' }} />
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={() => { onSave(val); onClose() }} style={{ flex: 1, padding: 10, background: 'var(--teal)', color: '#fff', border: 'none', fontSize: 14, fontWeight: 600, cursor: 'pointer', borderRadius: 3, fontFamily: 'inherit' }}>Save</button>
+          <button onClick={onClose} style={{ flex: 1, padding: 10, background: 'var(--white)', color: 'var(--text2)', border: '1px solid var(--border2)', fontSize: 14, cursor: 'pointer', borderRadius: 3, fontFamily: 'inherit' }}>Cancel</button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export default function CharacterSheetScreen() {
   const navigate = useNavigate()
   const { id } = useParams()
   const { user } = useAuthStore()
   const { characters, activeCharacter, setActiveCharacter, fetchCharacters, loading } = useCharacterStore()
-  const { editMode, setEditMode, activeSheet, closeSheet } = useUIStore()
+  const { editMode, setEditMode, activeSheet, openSheet, closeSheet } = useUIStore()
+  const [collapsed, setCollapsed] = useState(false)
+  const [showPhotoModal, setShowPhotoModal] = useState(false)
+  const [infoInitialTab, setInfoInitialTab] = useState<'about' | 'exp' | 'quick'>('about')
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const lastScrollY = useRef(0)
 
   useEffect(() => {
     if (user && characters.length === 0) fetchCharacters(user.id)
@@ -35,9 +59,28 @@ export default function CharacterSheetScreen() {
     if (found) setActiveCharacter(found)
   }, [id, characters, setActiveCharacter])
 
+  // Scroll-based header collapse
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    const onScroll = () => {
+      const y = el.scrollTop
+      if (y > 60 && !collapsed) setCollapsed(true)
+      else if (y < 20 && collapsed) setCollapsed(false)
+      lastScrollY.current = y
+    }
+    el.addEventListener('scroll', onScroll, { passive: true })
+    return () => el.removeEventListener('scroll', onScroll)
+  }, [collapsed])
+
   const scrollToSection = (idx: number) => {
+    if (idx === 4) { setInfoInitialTab('about'); openSheet('info'); return }
     const el = document.getElementById(SECTION_IDS[idx])
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
+  const savePhoto = async (url: string) => {
+    await useCharacterStore.getState().patchActiveCharacter({ photo_url: url })
   }
 
   if (loading && !activeCharacter) {
@@ -61,37 +104,63 @@ export default function CharacterSheetScreen() {
   const xpRange = nextXP - thisXP
   const xpPct = xpRange > 0 ? Math.min(100, Math.max(0, Math.round((exp - thisXP) / xpRange * 100))) : 0
   const hasSpells = CLASSES[c.class]?.spellcasting !== null || (c.spells?.length ?? 0) > 0
+  const photoUrl = c.photo_url
 
   return (
-    <div style={{ maxWidth: 600, margin: '0 auto', paddingBottom: 80 }}>
+    <div ref={scrollRef} style={{ maxWidth: 600, margin: '0 auto', paddingBottom: 80, height: '100vh', overflowY: 'auto' }}>
       {/* Sticky header */}
       <div style={{ position: 'sticky', top: 0, zIndex: 100, background: 'var(--teal)' }}>
-        <div style={{ color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 16px', height: 48 }}>
-          <button onClick={() => navigate('/characters')} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 14, fontWeight: 500, cursor: 'pointer', padding: '8px 4px' }}>← Back</button>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: 15, fontWeight: 700, lineHeight: 1.2 }}>{c.name}</div>
-            <div style={{ fontSize: 11, opacity: .85 }}>Lvl {lvl} {c.race} {c.class}</div>
-          </div>
-          <button
-            onClick={() => setEditMode(!editMode)}
-            style={{ background: editMode ? 'rgba(255,255,255,.25)' : 'none', border: editMode ? '1px solid rgba(255,255,255,.5)' : 'none', color: '#fff', fontSize: 18, cursor: 'pointer', padding: '4px 8px', borderRadius: 4 }}
-            title="Edit mode"
-          >
-            ✏️
-          </button>
-        </div>
 
-        {/* XP bar */}
-        <div style={{ background: 'var(--teal2)', height: 3 }}>
-          <div style={{ background: 'rgba(255,255,255,.5)', height: 3, width: `${xpPct}%`, transition: 'width .3s' }} />
-        </div>
+        {collapsed ? (
+          /* ── Collapsed header ── */
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 12px', height: 44, gap: 8 }}>
+            <button onClick={() => navigate('/characters')} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 13, fontWeight: 500, cursor: 'pointer', padding: '4px 2px', flexShrink: 0 }}>←</button>
+            {/* Avatar small */}
+            <div onClick={() => setShowPhotoModal(true)} style={{ width: 30, height: 30, borderRadius: '50%', overflow: 'hidden', border: '2px solid rgba(255,255,255,.4)', flexShrink: 0, cursor: 'pointer', background: 'rgba(255,255,255,.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {photoUrl ? <img src={photoUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 14 }}>🧙</span>}
+            </div>
+            <div style={{ flex: 1, fontSize: 14, fontWeight: 700, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</div>
+            <button
+              onClick={() => setEditMode(!editMode)}
+              style={{ background: editMode ? 'rgba(255,255,255,.25)' : 'none', border: editMode ? '1px solid rgba(255,255,255,.5)' : 'none', color: '#fff', fontSize: 16, cursor: 'pointer', padding: '3px 6px', borderRadius: 4, flexShrink: 0 }}
+            >✏️</button>
+          </div>
+        ) : (
+          /* ── Expanded header ── */
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', padding: '10px 14px', gap: 12 }}>
+              {/* Avatar large */}
+              <div onClick={() => setShowPhotoModal(true)} style={{ width: 60, height: 60, borderRadius: 8, overflow: 'hidden', border: '2px solid rgba(255,255,255,.5)', flexShrink: 0, cursor: 'pointer', background: 'rgba(255,255,255,.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {photoUrl ? <img src={photoUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 28 }}>🧙</span>}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 18, fontWeight: 700, color: '#fff', lineHeight: 1.2 }}>{c.name}</div>
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,.8)', marginTop: 2 }}>Level {lvl} {c.race} {c.class}</div>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,.65)', marginTop: 1 }}>{c.background} · {c.alignment}</div>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-end' }}>
+                <button onClick={() => navigate('/characters')} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,.85)', fontSize: 13, cursor: 'pointer', padding: '2px 0' }}>← Back</button>
+                <button
+                  onClick={() => setEditMode(!editMode)}
+                  style={{ background: editMode ? 'rgba(255,255,255,.25)' : 'rgba(255,255,255,.1)', border: editMode ? '1px solid rgba(255,255,255,.5)' : '1px solid rgba(255,255,255,.2)', color: '#fff', fontSize: 16, cursor: 'pointer', padding: '3px 8px', borderRadius: 4 }}
+                  title="Edit mode"
+                >✏️</button>
+              </div>
+            </div>
+
+            {/* XP bar */}
+            <div style={{ background: 'rgba(0,0,0,.15)', height: 4, margin: '0 14px 10px', borderRadius: 2 }}>
+              <div style={{ background: 'rgba(255,255,255,.6)', height: 4, width: `${xpPct}%`, borderRadius: 2, transition: 'width .3s' }} />
+            </div>
+          </div>
+        )}
 
         {/* Nav tabs */}
         <div style={{ display: 'flex', background: 'var(--white)', borderBottom: '2px solid var(--border)' }}>
           {NAV_TABS.map((tab, i) => {
             if (tab === 'Spells' && !hasSpells) return null
             return (
-              <button key={tab} onClick={() => scrollToSection(i)} style={{ flex: 1, padding: '9px 4px', textAlign: 'center', fontSize: 11, fontWeight: 600, color: 'var(--text3)', border: 'none', background: 'none', cursor: 'pointer', letterSpacing: '.3px', fontFamily: 'inherit' }}>
+              <button key={tab} onClick={() => scrollToSection(i)} style={{ flex: 1, padding: '9px 2px', textAlign: 'center', fontSize: 11, fontWeight: 600, color: 'var(--text3)', border: 'none', background: 'none', cursor: 'pointer', letterSpacing: '.3px', fontFamily: 'inherit' }}>
                 {tab}
               </button>
             )
@@ -159,6 +228,10 @@ export default function CharacterSheetScreen() {
         <RestSheet character={c} />
       </BottomSheet>
 
+      <BottomSheet open={activeSheet === 'info'} onClose={closeSheet} title="Character Info">
+        <InfoSheet character={c} initialTab={infoInitialTab} />
+      </BottomSheet>
+
       <Toast />
 
       {/* Edit mode indicator */}
@@ -166,6 +239,15 @@ export default function CharacterSheetScreen() {
         <div style={{ position: 'fixed', bottom: 16, left: '50%', transform: 'translateX(-50%)', background: 'var(--teal)', color: '#fff', padding: '8px 20px', borderRadius: 20, fontSize: 13, fontWeight: 600, zIndex: 90, boxShadow: '0 4px 16px rgba(0,0,0,.2)' }}>
           Edit Mode — tap ✏️ to exit
         </div>
+      )}
+
+      {/* Photo modal */}
+      {showPhotoModal && (
+        <PhotoModal
+          current={c.photo_url ?? ''}
+          onSave={savePhoto}
+          onClose={() => setShowPhotoModal(false)}
+        />
       )}
     </div>
   )

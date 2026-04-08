@@ -56,8 +56,13 @@ export default function SpellsSection({ character: c }: Props) {
     used[lvlIdx] = (used[lvlIdx] ?? 0) + 1
     const updates: Partial<Character> = { spell_slots_used: used }
     if (spell.concentration) {
+      const old = c.concentration_spell
       updates.concentration_spell = spell.name
-      showToast(`Concentrating on ${spell.name}`)
+      if (old && old !== spell.name) {
+        showToast(`Dropped ${old} — concentrating on ${spell.name}`)
+      } else {
+        showToast(`Concentrating on ${spell.name}`)
+      }
     } else {
       showToast(`Cast ${spell.name}`)
     }
