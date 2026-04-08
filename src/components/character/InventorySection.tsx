@@ -3,13 +3,14 @@ import type { Character, InventoryItem } from '@/types'
 import { GEAR_DB, GEAR_CATEGORIES } from '@/data'
 import { useCharacterStore } from '@/store/characterStore'
 import { useUIStore } from '@/store/uiStore'
+import AddModal from '@/components/shared/AddModal'
 
 interface Props { character: Character }
 
 export default function InventorySection({ character: c }: Props) {
   const { patchActiveCharacter } = useCharacterStore()
   const { showToast, editMode } = useUIStore()
-  const [showDB, setShowDB] = useState(false)
+  const [showAddModal, setShowAddModal] = useState(false)
   const [dbFilter, setDbFilter] = useState('All')
   const [dbQuery, setDbQuery] = useState('')
   const [customName, setCustomName] = useState('')
@@ -40,7 +41,7 @@ export default function InventorySection({ character: c }: Props) {
     if (existing) { await adjustQty(customName.trim(), 1) }
     else { await patchActiveCharacter({ inventory: [...(c.inventory ?? []), { name: customName.trim(), quantity: 1 }] }) }
     showToast(`${customName.trim()} added`)
-    setCustomName('')
+    setCustomName(''); setShowCustom(false); setShowAddModal(false)
   }
 
   const setCurrency = async (field: 'pp' | 'gp' | 'ep' | 'sp' | 'cp', val: string) => {
@@ -59,7 +60,7 @@ export default function InventorySection({ character: c }: Props) {
       {/* Inventory header */}
       <div style={{ background: 'var(--white)', border: '1px solid var(--border)', borderTop: 'none', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px' }}>
         <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.5px' }}>Inventory</span>
-        <button onClick={() => { setShowDB(!showDB); setShowCustom(false) }} style={{ fontSize: 13, color: 'var(--purple)', cursor: 'pointer', fontWeight: 500, background: 'none', border: 'none', fontFamily: 'inherit', padding: 0 }}>+ Add Item</button>
+        <button onClick={() => setShowAddModal(true)} style={{ fontSize: 13, color: 'var(--purple)', cursor: 'pointer', fontWeight: 500, background: 'none', border: 'none', fontFamily: 'inherit', padding: 0 }}>+ Add Item</button>
       </div>
 
       {/* Item list */}
@@ -77,47 +78,56 @@ export default function InventorySection({ character: c }: Props) {
             <span style={{ fontSize: 15, fontWeight: 700, minWidth: 24, textAlign: 'center' }}>{item.quantity}</span>
             <button onClick={() => adjustQty(item.name, 1)} style={{ width: 28, height: 28, border: '1px solid var(--border2)', background: 'var(--white)', cursor: 'pointer', fontSize: 16, borderRadius: 2, color: 'var(--text3)', fontFamily: 'inherit', padding: 0 }}>+</button>
           </div>
+          {editMode && (
+            <button onClick={() => adjustQty(item.name, -item.quantity)} style={{ padding: '4px 8px', border: '1px solid var(--red)', background: '#fde8e8', fontSize: 12, cursor: 'pointer', borderRadius: 2, fontFamily: 'inherit', color: 'var(--red)' }}>✕</button>
+          )}
         </div>
       ))}
 
-      {/* Gear DB */}
-      {showDB && (
-        <div style={{ background: 'var(--white)', border: '1px solid var(--border)', borderTop: 'none', maxHeight: 380, overflowY: 'auto' }}>
-          <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, background: 'var(--white)', zIndex: 2 }}>
-            <input value={dbQuery} onChange={e => setDbQuery(e.target.value)} placeholder="Search items..." style={{ width: '100%', border: '1px solid var(--border2)', padding: '7px 10px', fontSize: 14, fontFamily: 'inherit', color: 'var(--text)', borderRadius: 2, outline: 'none', background: 'var(--white)' }} />
-          </div>
-          <div style={{ display: 'flex', gap: 6, padding: '7px 14px', borderBottom: '1px solid var(--border)', flexWrap: 'wrap', position: 'sticky', top: 53, background: 'var(--white)', zIndex: 2 }}>
-            {['All', ...GEAR_CATEGORIES].map(cat => (
-              <button key={cat} onClick={() => setDbFilter(cat)} style={{ padding: '3px 8px', border: '1px solid var(--border2)', background: dbFilter === cat ? 'var(--purple)' : 'var(--white)', color: dbFilter === cat ? '#fff' : 'var(--text2)', fontSize: 11, cursor: 'pointer', borderRadius: 2, fontFamily: 'inherit' }}>
-                {cat}
-              </button>
-            ))}
-          </div>
-          {filteredDB.map(g => (
-            <div key={g.name} onClick={() => addFromDB(g.name)} style={{ display: 'flex', alignItems: 'center', padding: '9px 14px', borderBottom: '1px solid var(--border)', cursor: 'pointer' }}
+      {/* Add item modal */}
+      <AddModal open={showAddModal} onClose={() => { setShowAddModal(false); setShowCustom(false) }} title="Add Item">
+        <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, background: 'var(--white)', zIndex: 2 }}>
+          <input autoFocus value={dbQuery} onChange={e => setDbQuery(e.target.value)} placeholder="Search items..." style={{ width: '100%', border: '1px solid var(--border2)', padding: '9px 12px', fontSize: 15, fontFamily: 'inherit', color: 'var(--text)', borderRadius: 4, outline: 'none', background: 'var(--white)', boxSizing: 'border-box' }} />
+        </div>
+        <div style={{ display: 'flex', gap: 6, padding: '8px 14px', borderBottom: '1px solid var(--border)', flexWrap: 'wrap', position: 'sticky', top: 57, background: 'var(--white)', zIndex: 2 }}>
+          {['All', ...GEAR_CATEGORIES].map(cat => (
+            <button key={cat} onClick={() => setDbFilter(cat)} style={{ padding: '4px 8px', border: '1px solid var(--border2)', background: dbFilter === cat ? 'var(--purple)' : 'var(--white)', color: dbFilter === cat ? '#fff' : 'var(--text2)', fontSize: 11, cursor: 'pointer', borderRadius: 3, fontFamily: 'inherit' }}>
+              {cat}
+            </button>
+          ))}
+        </div>
+
+        {filteredDB.length === 0 && (
+          <div style={{ padding: '24px 14px', textAlign: 'center', color: 'var(--text3)', fontSize: 14 }}>No items found</div>
+        )}
+        {filteredDB.map(g => {
+          const existing = (c.inventory ?? []).find(i => i.name === g.name)
+          return (
+            <div key={g.name} onClick={() => { addFromDB(g.name) }} style={{ display: 'flex', alignItems: 'center', padding: '12px 14px', borderBottom: '1px solid var(--border)', cursor: 'pointer', background: 'var(--white)' }}
               onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--purple-light)'}
-              onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = ''}
+              onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'var(--white)'}
             >
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 14, fontWeight: 500 }}>{g.name}</div>
-                <div style={{ fontSize: 11, color: 'var(--text3)' }}>{g.cost} · {g.category}</div>
+                <div style={{ fontSize: 15, fontWeight: 500 }}>{g.name}</div>
+                <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 2 }}>{g.cost} · {g.category}</div>
               </div>
-              <span style={{ fontSize: 12, color: 'var(--purple)', fontWeight: 600 }}>+ Add</span>
+              {existing && <span style={{ fontSize: 12, color: 'var(--text3)', marginRight: 10 }}>×{existing.quantity}</span>}
+              <span style={{ fontSize: 13, color: 'var(--purple)', fontWeight: 600, minWidth: 40, textAlign: 'right' }}>+ Add</span>
             </div>
-          ))}
+          )
+        })}
 
-          {/* Custom item */}
-          <div style={{ padding: '10px 14px', borderTop: '1px solid var(--border)' }}>
-            <button onClick={() => setShowCustom(!showCustom)} style={{ fontSize: 13, color: 'var(--purple)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 500 }}>+ Custom item</button>
-            {showCustom && (
-              <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-                <input value={customName} onChange={e => setCustomName(e.target.value)} onKeyDown={e => e.key === 'Enter' && addCustom()} placeholder="Item name" style={{ flex: 1, border: '1px solid var(--border2)', padding: '6px 8px', fontSize: 14, fontFamily: 'inherit', borderRadius: 2, outline: 'none', color: 'var(--text)', background: 'var(--white)' }} />
-                <button onClick={addCustom} disabled={!customName.trim()} style={{ padding: '6px 14px', background: 'var(--teal)', color: '#fff', border: 'none', fontSize: 13, fontWeight: 600, cursor: 'pointer', borderRadius: 2, fontFamily: 'inherit', opacity: customName.trim() ? 1 : 0.5 }}>Add</button>
-              </div>
-            )}
-          </div>
+        {/* Custom item */}
+        <div style={{ padding: '14px' }}>
+          <button onClick={() => setShowCustom(!showCustom)} style={{ fontSize: 14, color: 'var(--purple)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}>+ Custom item</button>
+          {showCustom && (
+            <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+              <input value={customName} onChange={e => setCustomName(e.target.value)} onKeyDown={e => e.key === 'Enter' && addCustom()} placeholder="Item name" style={{ flex: 1, border: '1px solid var(--border2)', padding: '8px 10px', fontSize: 14, fontFamily: 'inherit', borderRadius: 3, outline: 'none', color: 'var(--text)', background: 'var(--white)' }} />
+              <button onClick={addCustom} disabled={!customName.trim()} style={{ padding: '8px 16px', background: 'var(--teal)', color: '#fff', border: 'none', fontSize: 14, fontWeight: 600, cursor: 'pointer', borderRadius: 3, fontFamily: 'inherit', opacity: customName.trim() ? 1 : 0.5 }}>Add</button>
+            </div>
+          )}
         </div>
-      )}
+      </AddModal>
 
       {/* Currency */}
       <div style={{ background: 'var(--white)', border: '1px solid var(--border)', borderTop: 'none' }}>

@@ -4,6 +4,7 @@ import { WEAPON_DB, WEAPON_CATEGORIES, FINESSE_WEAPONS } from '@/data'
 import { mod, profBonus, fmtBonus } from '@/lib/calculations'
 import { useCharacterStore } from '@/store/characterStore'
 import { useUIStore } from '@/store/uiStore'
+import AddModal from '@/components/shared/AddModal'
 import type { Weapon } from '@/types'
 
 interface Props { character: Character }
@@ -39,7 +40,7 @@ function dmgBonus(c: Character, w: Weapon, finesseChoice?: 'str' | 'dex'): numbe
 export default function WeaponsSection({ character: c }: Props) {
   const { patchActiveCharacter } = useCharacterStore()
   const { showToast, editMode } = useUIStore()
-  const [showDB, setShowDB] = useState(false)
+  const [showAddModal, setShowAddModal] = useState(false)
   const [dbFilter, setDbFilter] = useState('All')
   const [dbQuery, setDbQuery] = useState('')
   const [openWeapon, setOpenWeapon] = useState<Weapon | null>(null)
@@ -82,7 +83,8 @@ export default function WeaponsSection({ character: c }: Props) {
     const w = { name: customName.trim(), damage: customDamage, damageType: customType, isCustom: true }
     await patchActiveCharacter({ weapons: [...(c.weapons ?? []), w] })
     showToast(`${w.name} added`)
-    setCustomName(''); setCustomDamage('1d6'); setCustomType('slashing'); setShowCustom(false)
+    setCustomName(''); setCustomDamage('1d6'); setCustomType('slashing')
+    setShowCustom(false); setShowAddModal(false)
   }
 
   const filteredDB = WEAPON_DB.filter(w => {
@@ -95,7 +97,7 @@ export default function WeaponsSection({ character: c }: Props) {
     <div>
       <div style={{ background: 'var(--white)', border: '1px solid var(--border)', borderTop: 'none', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px' }}>
         <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.5px' }}>Weapons</span>
-        <button onClick={() => { setShowDB(!showDB); setShowCustom(false) }} style={{ fontSize: 13, color: 'var(--purple)', cursor: 'pointer', fontWeight: 500, background: 'none', border: 'none', fontFamily: 'inherit', padding: 0 }}>+ Add Weapon</button>
+        <button onClick={() => setShowAddModal(true)} style={{ fontSize: 13, color: 'var(--purple)', cursor: 'pointer', fontWeight: 500, background: 'none', border: 'none', fontFamily: 'inherit', padding: 0 }}>+ Add Weapon</button>
       </div>
 
       {/* Active weapon card */}
@@ -149,53 +151,53 @@ export default function WeaponsSection({ character: c }: Props) {
         )
       })}
 
-      {/* Add from DB */}
-      {showDB && (
-        <div style={{ background: 'var(--white)', border: '1px solid var(--border)', borderTop: 'none', maxHeight: 400, overflowY: 'auto' }}>
-          <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, background: 'var(--white)', zIndex: 2 }}>
-            <input value={dbQuery} onChange={e => setDbQuery(e.target.value)} placeholder="Search weapons..." style={{ width: '100%', border: '1px solid var(--border2)', padding: '7px 10px', fontSize: 14, fontFamily: 'inherit', color: 'var(--text)', borderRadius: 2, outline: 'none', background: 'var(--white)' }} />
-          </div>
-          <div style={{ display: 'flex', gap: 6, padding: '7px 14px', borderBottom: '1px solid var(--border)', flexWrap: 'wrap', position: 'sticky', top: 53, background: 'var(--white)', zIndex: 2 }}>
-            {['All', ...WEAPON_CATEGORIES].map(cat => (
-              <button key={cat} onClick={() => setDbFilter(cat)} style={{ padding: '3px 8px', border: '1px solid var(--border2)', background: dbFilter === cat ? 'var(--purple)' : 'var(--white)', color: dbFilter === cat ? '#fff' : 'var(--text2)', fontSize: 11, cursor: 'pointer', borderRadius: 2, fontFamily: 'inherit' }}>
-                {cat === 'Simple Melee' ? 'Simple' : cat === 'Martial Melee' ? 'Martial' : cat === 'Simple Ranged' ? 'S.Ranged' : cat === 'Martial Ranged' ? 'M.Ranged' : cat}
-              </button>
-            ))}
-          </div>
-          {filteredDB.map(w => {
-            const added = (c.weapons ?? []).some(x => x.name === w.name)
-            return (
-              <div key={w.name} onClick={() => { setOpenWeapon(w) }} style={{ display: 'flex', alignItems: 'center', padding: '9px 14px', borderBottom: '1px solid var(--border)', cursor: 'pointer', opacity: added ? 0.5 : 1 }}
-                onMouseEnter={e => { if (!added) (e.currentTarget as HTMLElement).style.background = 'var(--purple-light)' }}
-                onMouseLeave={e => { if (!added) (e.currentTarget as HTMLElement).style.background = '' }}
-              >
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 14, fontWeight: 500 }}>{w.name}</div>
-                  <div style={{ fontSize: 11, color: 'var(--text3)' }}>{w.damage} {w.damageType}</div>
-                </div>
-                <span style={{ fontSize: 11, color: 'var(--text3)', marginRight: 10 }}>{w.category}</span>
-                <span style={{ fontSize: 12, color: 'var(--purple)', fontWeight: 600 }}>{added ? '✓' : '+ Add'}</span>
+      {/* Add weapon modal */}
+      <AddModal open={showAddModal} onClose={() => { setShowAddModal(false); setShowCustom(false) }} title="Add Weapon">
+        <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, background: 'var(--white)', zIndex: 2 }}>
+          <input autoFocus value={dbQuery} onChange={e => setDbQuery(e.target.value)} placeholder="Search weapons..." style={{ width: '100%', border: '1px solid var(--border2)', padding: '9px 12px', fontSize: 15, fontFamily: 'inherit', color: 'var(--text)', borderRadius: 4, outline: 'none', background: 'var(--white)', boxSizing: 'border-box' }} />
+        </div>
+        <div style={{ display: 'flex', gap: 6, padding: '8px 14px', borderBottom: '1px solid var(--border)', flexWrap: 'wrap', position: 'sticky', top: 57, background: 'var(--white)', zIndex: 2 }}>
+          {['All', ...WEAPON_CATEGORIES].map(cat => (
+            <button key={cat} onClick={() => setDbFilter(cat)} style={{ padding: '4px 8px', border: '1px solid var(--border2)', background: dbFilter === cat ? 'var(--purple)' : 'var(--white)', color: dbFilter === cat ? '#fff' : 'var(--text2)', fontSize: 11, cursor: 'pointer', borderRadius: 3, fontFamily: 'inherit' }}>
+              {cat === 'Simple Melee' ? 'Simple' : cat === 'Martial Melee' ? 'Martial' : cat === 'Simple Ranged' ? 'S.Ranged' : cat === 'Martial Ranged' ? 'M.Ranged' : cat}
+            </button>
+          ))}
+        </div>
+
+        {filteredDB.map(w => {
+          const added = (c.weapons ?? []).some(x => x.name === w.name)
+          return (
+            <div key={w.name} onClick={() => setOpenWeapon(w)} style={{ display: 'flex', alignItems: 'center', padding: '12px 14px', borderBottom: '1px solid var(--border)', cursor: 'pointer', background: 'var(--white)', opacity: added ? 0.45 : 1 }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--purple-light)' }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'var(--white)' }}
+            >
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 15, fontWeight: 500 }}>{w.name}</div>
+                <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 2 }}>{w.damage} {w.damageType} · {w.category}</div>
               </div>
-            )
-          })}
-          <div style={{ padding: '10px 14px', borderTop: '1px solid var(--border)' }}>
-            <button onClick={() => setShowCustom(!showCustom)} style={{ fontSize: 13, color: 'var(--purple)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 500 }}>+ Custom weapon</button>
-          </div>
+              <span style={{ fontSize: 13, color: added ? 'var(--text3)' : 'var(--purple)', fontWeight: 600, minWidth: 40, textAlign: 'right' }}>{added ? '✓' : '+ Add'}</span>
+            </div>
+          )
+        })}
+
+        {/* Custom weapon */}
+        <div style={{ padding: '14px', borderTop: '1px solid var(--border)' }}>
+          <button onClick={() => setShowCustom(!showCustom)} style={{ fontSize: 14, color: 'var(--purple)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}>+ Custom weapon</button>
           {showCustom && (
-            <div style={{ padding: '10px 14px', borderTop: '1px solid var(--border)' }}>
+            <div style={{ marginTop: 10 }}>
               <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-                <input value={customName} onChange={e => setCustomName(e.target.value)} placeholder="Name" style={{ flex: 2, border: '1px solid var(--border2)', padding: '6px 8px', fontSize: 14, fontFamily: 'inherit', borderRadius: 2, outline: 'none', color: 'var(--text)', background: 'var(--white)' }} />
-                <input value={customDamage} onChange={e => setCustomDamage(e.target.value)} placeholder="1d6" style={{ flex: 1, border: '1px solid var(--border2)', padding: '6px 8px', fontSize: 14, fontFamily: 'inherit', borderRadius: 2, outline: 'none', color: 'var(--text)', background: 'var(--white)' }} />
+                <input value={customName} onChange={e => setCustomName(e.target.value)} placeholder="Name" style={{ flex: 2, border: '1px solid var(--border2)', padding: '8px 10px', fontSize: 14, fontFamily: 'inherit', borderRadius: 3, outline: 'none', color: 'var(--text)', background: 'var(--white)' }} />
+                <input value={customDamage} onChange={e => setCustomDamage(e.target.value)} placeholder="1d6" style={{ flex: 1, border: '1px solid var(--border2)', padding: '8px 10px', fontSize: 14, fontFamily: 'inherit', borderRadius: 3, outline: 'none', color: 'var(--text)', background: 'var(--white)' }} />
               </div>
-              <button onClick={addCustom} disabled={!customName.trim()} style={{ display: 'block', width: '100%', padding: 10, background: 'var(--teal)', color: '#fff', border: 'none', fontSize: 13, fontWeight: 600, cursor: 'pointer', borderRadius: 2, fontFamily: 'inherit', opacity: customName.trim() ? 1 : 0.5 }}>Add Custom Weapon</button>
+              <button onClick={addCustom} disabled={!customName.trim()} style={{ display: 'block', width: '100%', padding: 11, background: 'var(--teal)', color: '#fff', border: 'none', fontSize: 14, fontWeight: 600, cursor: 'pointer', borderRadius: 3, fontFamily: 'inherit', opacity: customName.trim() ? 1 : 0.5 }}>Add Custom Weapon</button>
             </div>
           )}
         </div>
-      )}
+      </AddModal>
 
       {/* Weapon detail */}
       {openWeapon && (
-        <div onClick={e => { if (e.target === e.currentTarget) setOpenWeapon(null) }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 200, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+        <div onClick={e => { if (e.target === e.currentTarget) setOpenWeapon(null) }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 300, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
           <div style={{ background: 'var(--white)', width: '100%', maxWidth: 600, borderRadius: '14px 14px 0 0', padding: '20px 16px 32px', maxHeight: '80vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
               <div style={{ fontSize: 20, fontWeight: 700 }}>{openWeapon.name}</div>
@@ -208,7 +210,7 @@ export default function WeaponsSection({ character: c }: Props) {
               ))}
             </div>
             {openWeapon.properties.length > 0 && <div style={{ marginBottom: 12 }}><div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 4 }}>Properties</div><div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>{openWeapon.properties.map(p => <span key={p} style={{ padding: '2px 8px', background: 'var(--purple-light)', color: 'var(--purple)', borderRadius: 2, fontSize: 12, fontWeight: 500 }}>{p}</span>)}</div></div>}
-            <button onClick={() => { addFromDB(openWeapon.name); setOpenWeapon(null); setShowDB(false) }} style={{ display: 'block', width: '100%', padding: 12, background: 'var(--teal)', color: '#fff', border: 'none', fontSize: 14, fontWeight: 600, cursor: 'pointer', borderRadius: 2, fontFamily: 'inherit' }}>+ Add to Character</button>
+            <button onClick={() => { addFromDB(openWeapon.name); setOpenWeapon(null); setShowAddModal(false) }} style={{ display: 'block', width: '100%', padding: 12, background: 'var(--teal)', color: '#fff', border: 'none', fontSize: 14, fontWeight: 600, cursor: 'pointer', borderRadius: 2, fontFamily: 'inherit' }}>+ Add to Character</button>
           </div>
         </div>
       )}

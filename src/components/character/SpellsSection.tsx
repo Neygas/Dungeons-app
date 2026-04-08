@@ -5,6 +5,7 @@ import { CLASSES, SPELL_DB, SPELL_SLOTS_TABLE } from '@/data'
 import { spellSaveDC, spellAttackBonus, fmtBonus } from '@/lib/calculations'
 import { useCharacterStore } from '@/store/characterStore'
 import { useUIStore } from '@/store/uiStore'
+import AddModal from '@/components/shared/AddModal'
 
 interface Props { character: Character }
 
@@ -15,7 +16,7 @@ export default function SpellsSection({ character: c }: Props) {
   const { patchActiveCharacter } = useCharacterStore()
   const { showToast } = useUIStore()
   const [openSpell, setOpenSpell] = useState<Spell | null>(null)
-  const [showDB, setShowDB] = useState(false)
+  const [showAddModal, setShowAddModal] = useState(false)
   const [dbQuery, setDbQuery] = useState('')
   const [dbFilter, setDbFilter] = useState<number | 'all'>('all')
 
@@ -94,7 +95,7 @@ export default function SpellsSection({ character: c }: Props) {
       {/* Section header */}
       <div style={{ background: 'var(--white)', border: '1px solid var(--border)', borderTop: 'none', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px' }}>
         <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.5px' }}>Spells</span>
-        <button onClick={() => setShowDB(!showDB)} style={{ fontSize: 13, color: 'var(--purple)', cursor: 'pointer', fontWeight: 500, background: 'none', border: 'none', fontFamily: 'inherit', padding: 0 }}>+ Add Spell</button>
+        <button onClick={() => setShowAddModal(true)} style={{ fontSize: 13, color: 'var(--purple)', cursor: 'pointer', fontWeight: 500, background: 'none', border: 'none', fontFamily: 'inherit', padding: 0 }}>+ Add Spell</button>
       </div>
 
       {/* Spell stats */}
@@ -157,37 +158,38 @@ export default function SpellsSection({ character: c }: Props) {
         </div>
       ))}
 
-      {/* Add spell DB panel */}
-      {showDB && (
-        <div style={{ background: 'var(--white)', border: '1px solid var(--border)', borderTop: 'none', maxHeight: 400, overflowY: 'auto' }}>
-          <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, background: 'var(--white)', zIndex: 2 }}>
-            <input value={dbQuery} onChange={e => setDbQuery(e.target.value)} placeholder="Search spells..." style={{ width: '100%', border: '1px solid var(--border2)', padding: '7px 10px', fontSize: 14, fontFamily: 'inherit', color: 'var(--text)', borderRadius: 2, outline: 'none', background: 'var(--white)' }} />
-          </div>
-          <div style={{ display: 'flex', gap: 6, padding: '7px 14px', borderBottom: '1px solid var(--border)', flexWrap: 'wrap' }}>
-            {['all', 0, 1, 2, 3, 4, 5].map(f => (
-              <button key={String(f)} onClick={() => setDbFilter(f as typeof dbFilter)} style={{ padding: '3px 10px', border: '1px solid var(--border2)', background: dbFilter === f ? 'var(--purple)' : 'var(--white)', color: dbFilter === f ? '#fff' : 'var(--text2)', fontSize: 12, cursor: 'pointer', borderRadius: 2, fontFamily: 'inherit' }}>
-                {f === 'all' ? 'All' : LEVEL_NAMES[Number(f)]}
-              </button>
-            ))}
-          </div>
-          {dbSpells.map(spell => {
-            const added = (c.spells ?? []).some(s => s.name === spell.name)
-            return (
-              <div key={spell.name} onClick={() => !added && addSpell(spell)} style={{ display: 'flex', alignItems: 'center', padding: '9px 14px', borderBottom: '1px solid var(--border)', cursor: added ? 'default' : 'pointer', opacity: added ? 0.5 : 1 }}
-                onMouseEnter={e => { if (!added) (e.currentTarget as HTMLElement).style.background = 'var(--purple-light)' }}
-                onMouseLeave={e => { if (!added) (e.currentTarget as HTMLElement).style.background = '' }}
-              >
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 14, fontWeight: 500 }}>{spell.name}</div>
-                  <div style={{ fontSize: 11, color: 'var(--text3)' }}>{spell.school} · {spell.castTime}</div>
-                </div>
-                <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--purple)', minWidth: 48 }}>{LEVEL_NAMES[spell.level]}</span>
-                <span style={{ fontSize: 12, color: 'var(--purple)', fontWeight: 600 }}>{added ? '✓' : '+ Add'}</span>
-              </div>
-            )
-          })}
+      {/* Add spell modal */}
+      <AddModal open={showAddModal} onClose={() => setShowAddModal(false)} title="Add Spell">
+        <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, background: 'var(--white)', zIndex: 2 }}>
+          <input autoFocus value={dbQuery} onChange={e => setDbQuery(e.target.value)} placeholder="Search spells..." style={{ width: '100%', border: '1px solid var(--border2)', padding: '9px 12px', fontSize: 15, fontFamily: 'inherit', color: 'var(--text)', borderRadius: 4, outline: 'none', background: 'var(--white)', boxSizing: 'border-box' }} />
         </div>
-      )}
+        <div style={{ display: 'flex', gap: 6, padding: '8px 14px', borderBottom: '1px solid var(--border)', flexWrap: 'wrap', position: 'sticky', top: 57, background: 'var(--white)', zIndex: 2 }}>
+          {['all', 0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(f => (
+            <button key={String(f)} onClick={() => setDbFilter(f as typeof dbFilter)} style={{ padding: '4px 10px', border: '1px solid var(--border2)', background: dbFilter === f ? 'var(--purple)' : 'var(--white)', color: dbFilter === f ? '#fff' : 'var(--text2)', fontSize: 12, cursor: 'pointer', borderRadius: 3, fontFamily: 'inherit' }}>
+              {f === 'all' ? 'All' : LEVEL_NAMES[Number(f)]}
+            </button>
+          ))}
+        </div>
+        {dbSpells.length === 0 && (
+          <div style={{ padding: '24px 14px', textAlign: 'center', color: 'var(--text3)', fontSize: 14 }}>No spells found</div>
+        )}
+        {dbSpells.map(spell => {
+          const added = (c.spells ?? []).some(s => s.name === spell.name)
+          return (
+            <div key={spell.name} onClick={() => { if (!added) { addSpell(spell); setShowAddModal(false) } }} style={{ display: 'flex', alignItems: 'center', padding: '12px 14px', borderBottom: '1px solid var(--border)', cursor: added ? 'default' : 'pointer', background: 'var(--white)', opacity: added ? 0.45 : 1 }}
+              onMouseEnter={e => { if (!added) (e.currentTarget as HTMLElement).style.background = 'var(--purple-light)' }}
+              onMouseLeave={e => { if (!added) (e.currentTarget as HTMLElement).style.background = 'var(--white)' }}
+            >
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 15, fontWeight: 500 }}>{spell.name}</div>
+                <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 2 }}>{spell.school} · {spell.castTime}{spell.concentration ? ' · Conc.' : ''}{spell.ritual ? ' · Ritual' : ''}</div>
+              </div>
+              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--purple)', marginRight: 12, minWidth: 44, textAlign: 'right' }}>{LEVEL_NAMES[spell.level]}</span>
+              <span style={{ fontSize: 13, color: added ? 'var(--text3)' : 'var(--purple)', fontWeight: 600, minWidth: 40, textAlign: 'right' }}>{added ? '✓' : '+ Add'}</span>
+            </div>
+          )
+        })}
+      </AddModal>
 
       {/* Spell detail modal */}
       {openSpell && <SpellDetail spell={openSpell} character={c} onClose={() => setOpenSpell(null)} onCast={castSpell} onRemove={removeSpell} slots={slots} slotsUsed={c.spell_slots_used ?? []} />}
