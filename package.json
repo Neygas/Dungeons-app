@@ -7,9 +7,11 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "start": "serve -s dist"
   },
   "dependencies": {
+    "serve": "^14.2.4",
     "@supabase/supabase-js": "^2.49.4",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
