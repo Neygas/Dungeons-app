@@ -11,6 +11,7 @@ export default function HPSection({ character: c }: Props) {
   const { patchActiveCharacter } = useCharacterStore()
   const { showToast, openSheet } = useUIStore()
   const [adjVal, setAdjVal] = useState('')
+  const [showMenu, setShowMenu] = useState(false)
 
   const pct = c.max_hp > 0 ? Math.max(0, c.hp) / c.max_hp : 0
   const color = hpColor(pct)
@@ -19,19 +20,17 @@ export default function HPSection({ character: c }: Props) {
   const applyDamage = async () => {
     const n = parseInt(adjVal)
     if (!n || n <= 0) return
-    let newHp = Math.max(0, c.hp - n)
     showToast(`-${n} HP`)
     setAdjVal('')
-    await patchActiveCharacter({ hp: newHp })
+    await patchActiveCharacter({ hp: Math.max(0, c.hp - n) })
   }
 
   const applyHeal = async () => {
     const n = parseInt(adjVal)
     if (!n || n <= 0) return
-    const newHp = Math.min(c.max_hp + (c.temp_hp ?? 0), c.hp + n)
     showToast(`+${n} HP`)
     setAdjVal('')
-    await patchActiveCharacter({ hp: newHp })
+    await patchActiveCharacter({ hp: Math.min(c.max_hp + (c.temp_hp ?? 0), c.hp + n) })
   }
 
   const toggleDeathSave = async (type: 'success' | 'failure', idx: number) => {
@@ -39,29 +38,58 @@ export default function HPSection({ character: c }: Props) {
     const current = type === 'success' ? c.death_successes : c.death_failures
     const newVal = current > idx ? idx : idx + 1
     const updates: Partial<Character> = { [field]: newVal }
-    if (type === 'success' && newVal >= 3) {
-      updates.is_stable = true
-      showToast('Stable!')
-    }
-    if (type === 'failure' && newVal >= 3) {
-      updates.is_dead = true
-      showToast('Character has died...')
-    }
+    if (type === 'success' && newVal >= 3) { updates.is_stable = true; showToast('Stable!') }
+    if (type === 'failure' && newVal >= 3) { updates.is_dead = true; showToast('Character has died...') }
     await patchActiveCharacter(updates)
   }
+
+  const menuItems = [
+    { label: 'Conditions' + (c.conditions.length > 0 ? ` (${c.conditions.length})` : ''), action: () => { openSheet('conditions'); setShowMenu(false) } },
+    { label: 'Temp HP', action: () => { openSheet('tempHp'); setShowMenu(false) } },
+    { label: 'Short Rest', action: () => { openSheet('rest'); setShowMenu(false) } },
+    { label: 'Long Rest', action: () => { openSheet('rest'); setShowMenu(false) } },
+  ]
 
   return (
     <div>
       {/* HP bar */}
-      <div style={{ background: 'var(--white)', border: '1px solid var(--border)', padding: 14 }}>
+      <div style={{ background: 'var(--white)', border: '1px solid var(--border)', padding: 14, position: 'relative' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
           <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.5px' }}>Hit Points</span>
-          <span style={{ fontSize: 22, fontWeight: 700, color }}>
-            {c.hp}
-            <span style={{ fontSize: 14, fontWeight: 400, color: 'var(--text3)' }}> / {c.max_hp}</span>
-            {(c.temp_hp ?? 0) > 0 && <span style={{ fontSize: 13, color: 'var(--teal)', marginLeft: 6 }}>+{c.temp_hp} temp</span>}
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontSize: 22, fontWeight: 700, color }}>
+              {c.hp}
+              <span style={{ fontSize: 14, fontWeight: 400, color: 'var(--text3)' }}> / {c.max_hp}</span>
+              {(c.temp_hp ?? 0) > 0 && <span style={{ fontSize: 13, color: 'var(--teal)', marginLeft: 6 }}>+{c.temp_hp} temp</span>}
+            </span>
+            {/* ... menu button */}
+            <div style={{ position: 'relative' }}>
+              <button
+                onClick={() => setShowMenu(!showMenu)}
+                style={{ width: 30, height: 30, border: '1px solid var(--border2)', background: showMenu ? 'var(--bg)' : 'var(--white)', borderRadius: 4, cursor: 'pointer', fontSize: 16, fontWeight: 700, color: 'var(--text3)', fontFamily: 'inherit', letterSpacing: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >
+                •••
+              </button>
+              {showMenu && (
+                <>
+                  <div onClick={() => setShowMenu(false)} style={{ position: 'fixed', inset: 0, zIndex: 49 }} />
+                  <div style={{ position: 'absolute', top: 34, right: 0, background: 'var(--white)', border: '1px solid var(--border)', borderRadius: 6, minWidth: 150, zIndex: 50, boxShadow: '0 4px 16px rgba(0,0,0,.12)', overflow: 'hidden' }}>
+                    {menuItems.map(item => (
+                      <button key={item.label} onClick={item.action} style={{ display: 'block', width: '100%', padding: '11px 14px', border: 'none', borderBottom: '1px solid var(--border)', background: 'var(--white)', cursor: 'pointer', fontSize: 14, textAlign: 'left', fontFamily: 'inherit', color: 'var(--text)' }}
+                        onMouseEnter={e => (e.currentTarget.style.background = '#f5f5f5')}
+                        onMouseLeave={e => (e.currentTarget.style.background = 'var(--white)')}
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
         </div>
+
+        {/* HP bar */}
         <div style={{ background: '#eee', height: 8, borderRadius: 4 }}>
           <div style={{ height: 8, borderRadius: 4, background: color, width: `${pct * 100}%`, transition: 'width .4s, background .4s' }} />
         </div>
@@ -69,23 +97,14 @@ export default function HPSection({ character: c }: Props) {
         {/* Damage / Heal */}
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 10 }}>
           <input
-            type="number"
-            min="0"
-            value={adjVal}
+            type="number" min="0" value={adjVal}
             onChange={e => setAdjVal(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') applyHeal() }}
             placeholder="0"
             style={{ width: 60, textAlign: 'center', border: '1px solid var(--border2)', padding: 6, fontSize: 15, fontFamily: 'inherit', borderRadius: 2, background: 'var(--white)', color: 'var(--text)', outline: 'none' }}
           />
-          <button onClick={applyDamage} style={{ flex: 1, padding: '8px 4px', border: '1px solid var(--red)', background: '#fde8e8', color: 'var(--red)', fontSize: 13, fontWeight: 600, cursor: 'pointer', borderRadius: 2, fontFamily: 'inherit' }}>
-            Damage
-          </button>
-          <button onClick={applyHeal} style={{ flex: 1, padding: '8px 4px', border: '1px solid var(--green)', background: '#e8f5e9', color: 'var(--green)', fontSize: 13, fontWeight: 600, cursor: 'pointer', borderRadius: 2, fontFamily: 'inherit' }}>
-            Heal
-          </button>
-          <button onClick={() => openSheet('tempHp')} style={{ padding: '8px 10px', border: '1px solid var(--border2)', background: 'var(--white)', color: 'var(--text3)', fontSize: 12, cursor: 'pointer', borderRadius: 2, fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
-            Temp HP
-          </button>
+          <button onClick={applyDamage} style={{ flex: 1, padding: '8px 4px', border: '1px solid var(--red)', background: '#fde8e8', color: 'var(--red)', fontSize: 13, fontWeight: 600, cursor: 'pointer', borderRadius: 2, fontFamily: 'inherit' }}>Damage</button>
+          <button onClick={applyHeal} style={{ flex: 1, padding: '8px 4px', border: '1px solid var(--green)', background: '#e8f5e9', color: 'var(--green)', fontSize: 13, fontWeight: 600, cursor: 'pointer', borderRadius: 2, fontFamily: 'inherit' }}>Heal</button>
         </div>
       </div>
 
@@ -98,7 +117,7 @@ export default function HPSection({ character: c }: Props) {
         </div>
       )}
 
-      {/* Death saving throws */}
+      {/* Death saves */}
       {isDown && (
         <div style={{ background: 'var(--white)', border: '1px solid var(--border)', borderTop: 'none', padding: '12px 14px' }}>
           <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 10 }}>Death Saving Throws</div>
@@ -121,16 +140,6 @@ export default function HPSection({ character: c }: Props) {
           ))}
         </div>
       )}
-
-      {/* Conditions & rest row */}
-      <div style={{ background: 'var(--white)', border: '1px solid var(--border)', borderTop: 'none', display: 'flex', borderBottom: 'none' }}>
-        <button onClick={() => openSheet('conditions')} style={{ flex: 1, padding: '10px 4px', border: 'none', borderRight: '1px solid var(--border)', background: 'var(--white)', fontSize: 13, fontWeight: 500, cursor: 'pointer', color: 'var(--text2)', fontFamily: 'inherit' }}>
-          Conditions {c.conditions.length > 0 ? `(${c.conditions.length})` : ''}
-        </button>
-        <button onClick={() => openSheet('rest')} style={{ flex: 1, padding: '10px 4px', border: 'none', background: 'var(--white)', fontSize: 13, fontWeight: 500, cursor: 'pointer', color: 'var(--text2)', fontFamily: 'inherit' }}>
-          Rest
-        </button>
-      </div>
     </div>
   )
 }
@@ -196,8 +205,7 @@ export function RestSheet({ character: c }: Props) {
   const [hdMode, setHdMode] = useState<'avg' | 'roll' | 'manual'>('avg')
   const [hdManual, setHdManual] = useState('')
 
-  const cls = c.class
-  const hd = { Barbarian: 12, Bard: 8, Cleric: 8, Druid: 8, Fighter: 10, Monk: 8, Paladin: 10, Ranger: 10, Rogue: 8, Sorcerer: 6, Warlock: 8, Wizard: 6 }[cls] ?? 8
+  const hd = { Barbarian: 12, Bard: 8, Cleric: 8, Druid: 8, Fighter: 10, Monk: 8, Paladin: 10, Ranger: 10, Rogue: 8, Sorcerer: 6, Warlock: 8, Wizard: 6 }[c.class] ?? 8
   const hdRem = c.hit_dice_total - c.hit_dice_used
   const conMod = Math.floor((c.con - 10) / 2)
 
@@ -207,23 +215,16 @@ export function RestSheet({ character: c }: Props) {
     if (hdMode === 'avg') gain = Math.floor(hd / 2) + 1 + conMod
     else if (hdMode === 'roll') gain = Math.floor(Math.random() * hd) + 1 + conMod
     else gain = parseInt(hdManual) || 0
-    const newHp = Math.min(c.max_hp, c.hp + Math.max(0, gain))
-    await patchActiveCharacter({ hp: newHp, hit_dice_used: c.hit_dice_used + 1 })
+    await patchActiveCharacter({ hp: Math.min(c.max_hp, c.hp + Math.max(0, gain)), hit_dice_used: c.hit_dice_used + 1 })
     showToast(`Short rest: +${Math.max(0, gain)} HP`)
     closeSheet()
   }
 
   const longRest = async () => {
-    const halfHD = Math.max(1, Math.floor(c.hit_dice_total / 2))
-    const newHdUsed = Math.max(0, c.hit_dice_used - halfHD)
     await patchActiveCharacter({
-      hp: c.max_hp,
-      hit_dice_used: newHdUsed,
+      hp: c.max_hp, hit_dice_used: Math.max(0, c.hit_dice_used - Math.max(1, Math.floor(c.hit_dice_total / 2))),
       spell_slots_used: c.spell_slots_used.map(() => 0),
-      death_successes: 0,
-      death_failures: 0,
-      is_stable: false,
-      conditions: [],
+      death_successes: 0, death_failures: 0, is_stable: false, conditions: [],
     })
     showToast('Long rest complete — fully restored')
     closeSheet()
@@ -231,7 +232,6 @@ export function RestSheet({ character: c }: Props) {
 
   return (
     <div style={{ padding: 16 }}>
-      {/* Short rest */}
       <div style={{ marginBottom: 20 }}>
         <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 12 }}>Short Rest <span style={{ color: 'var(--text3)', fontWeight: 400, fontSize: 13 }}>— Spend a Hit Die</span></div>
         <div style={{ fontSize: 13, color: 'var(--text3)', marginBottom: 10 }}>
@@ -241,28 +241,19 @@ export function RestSheet({ character: c }: Props) {
           {(['avg', 'roll', 'manual'] as const).map(m => (
             <button key={m} onClick={() => setHdMode(m)} style={{ flex: 1, padding: '10px 4px', border: `${hdMode === m ? 2 : 1}px solid ${hdMode === m ? 'var(--teal)' : 'var(--border2)'}`, background: hdMode === m ? 'var(--teal-light)' : 'var(--white)', cursor: 'pointer', borderRadius: 2, fontFamily: 'inherit' }}>
               <div style={{ fontSize: 13, fontWeight: 600 }}>{m === 'avg' ? 'Average' : m === 'roll' ? 'Roll' : 'Manual'}</div>
-              <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>
-                {m === 'avg' ? `${Math.floor(hd / 2) + 1}` : m === 'roll' ? `1d${hd}` : 'Enter value'}
-              </div>
+              <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>{m === 'avg' ? `${Math.floor(hd / 2) + 1}` : m === 'roll' ? `1d${hd}` : 'Enter value'}</div>
             </button>
           ))}
         </div>
-        {hdMode === 'manual' && (
-          <input type="number" value={hdManual} onChange={e => setHdManual(e.target.value)} placeholder="HP gained" style={{ width: 100, border: '1px solid var(--border2)', padding: 8, fontSize: 16, textAlign: 'center', fontFamily: 'inherit', borderRadius: 2, outline: 'none', marginBottom: 10, background: 'var(--white)', color: 'var(--text)' }} />
-        )}
+        {hdMode === 'manual' && <input type="number" value={hdManual} onChange={e => setHdManual(e.target.value)} placeholder="HP gained" style={{ width: 100, border: '1px solid var(--border2)', padding: 8, fontSize: 16, textAlign: 'center', fontFamily: 'inherit', borderRadius: 2, outline: 'none', marginBottom: 10, background: 'var(--white)', color: 'var(--text)' }} />}
         <button onClick={shortRest} disabled={hdRem <= 0} style={{ display: 'block', width: '100%', padding: 12, background: hdRem > 0 ? 'var(--white)' : 'var(--bg)', border: '1px solid var(--border2)', color: hdRem > 0 ? 'var(--text)' : 'var(--text3)', fontSize: 14, fontWeight: 500, cursor: hdRem > 0 ? 'pointer' : 'not-allowed', borderRadius: 2, fontFamily: 'inherit' }}>
-          Take Short Rest (use 1 HD + {conMod >= 0 ? '+' : ''}{conMod} CON)
+          Short Rest — use 1 HD + {conMod >= 0 ? '+' : ''}{conMod} CON
         </button>
       </div>
-
       <div style={{ borderTop: '1px solid var(--border)', paddingTop: 16 }}>
         <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>Long Rest <span style={{ color: 'var(--text3)', fontWeight: 400, fontSize: 13 }}>— 8 hours</span></div>
-        <div style={{ fontSize: 13, color: 'var(--text3)', marginBottom: 12, lineHeight: 1.6 }}>
-          Restores all HP, half your spent Hit Dice, all spell slots, and clears death saves.
-        </div>
-        <button onClick={longRest} style={{ display: 'block', width: '100%', padding: 12, background: 'var(--teal)', color: '#fff', border: 'none', fontSize: 14, fontWeight: 600, cursor: 'pointer', borderRadius: 2, fontFamily: 'inherit' }}>
-          Take Long Rest
-        </button>
+        <div style={{ fontSize: 13, color: 'var(--text3)', marginBottom: 12, lineHeight: 1.6 }}>Restores all HP, half spent Hit Dice, all spell slots, clears death saves and conditions.</div>
+        <button onClick={longRest} style={{ display: 'block', width: '100%', padding: 12, background: 'var(--teal)', color: '#fff', border: 'none', fontSize: 14, fontWeight: 600, cursor: 'pointer', borderRadius: 2, fontFamily: 'inherit' }}>Take Long Rest</button>
       </div>
     </div>
   )

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { Character } from '@/types'
-import { WEAPON_DB, WEAPON_CATEGORIES, FINESSE_WEAPONS } from '@/data'
+import { WEAPON_DB, WEAPON_CATEGORIES, FINESSE_WEAPONS, AMMO_MAP } from '@/data'
 import { mod, profBonus, fmtBonus } from '@/lib/calculations'
 import { useCharacterStore } from '@/store/characterStore'
 import { useUIStore } from '@/store/uiStore'
@@ -55,8 +55,37 @@ export default function WeaponsSection({ character: c }: Props) {
   const addFromDB = async (name: string) => {
     if ((c.weapons ?? []).some(w => w.name === name)) { showToast('Already have this weapon'); return }
     const w = WEAPON_DB.find(x => x.name === name)!
-    await patchActiveCharacter({ weapons: [...(c.weapons ?? []), { name: w.name }] })
-    showToast(`${name} added`)
+    const updates: Partial<Character> = { weapons: [...(c.weapons ?? []), { name: w.name }] }
+    // Auto-add ammo if this is a ranged weapon that uses ammo
+    const ammoEntry = AMMO_MAP[name]
+    if (ammoEntry) {
+      const ammoName = ammoEntry.replace(/ \(\d+\)/, '') // strip "(20)"
+      const qty = parseInt(ammoEntry.match(/\((\d+)\)/)?.[1] ?? '20')
+      const existing = (c.inventory ?? []).find(i => i.name === ammoName)
+      if (!existing) {
+        updates.inventory = [...(c.inventory ?? []), { name: ammoName, quantity: qty }]
+      }
+    }
+    await patchActiveCharacter(updates)
+    showToast(ammoEntry ? `${name} added + ${ammoEntry.replace(/ \(\d+\)/, '')} stocked` : `${name} added`)
+  }
+
+  // Ammo helpers
+  const getAmmoName = (weaponName: string) => {
+    const entry = AMMO_MAP[weaponName]
+    return entry ? entry.replace(/ \(\d+\)/, '') : null
+  }
+  const getAmmoCount = (ammoName: string) => (c.inventory ?? []).find(i => i.name === ammoName)?.quantity ?? 0
+  const adjustAmmo = async (ammoName: string, delta: number) => {
+    const inv = c.inventory ?? []
+    const existing = inv.find(i => i.name === ammoName)
+    if (!existing && delta > 0) {
+      await patchActiveCharacter({ inventory: [...inv, { name: ammoName, quantity: delta }] })
+    } else if (existing) {
+      const newQty = Math.max(0, existing.quantity + delta)
+      const next = newQty === 0 ? inv.filter(i => i.name !== ammoName) : inv.map(i => i.name === ammoName ? { ...i, quantity: newQty } : i)
+      await patchActiveCharacter({ inventory: next })
+    }
   }
 
   const removeWeapon = async (name: string) => {
@@ -108,6 +137,8 @@ export default function WeaponsSection({ character: c }: Props) {
         const atk = dbW ? atkBonus(c, dbW, fc) : 0
         const dmg = dbW ? dmgBonus(c, dbW, fc) : 0
         const dmgStr = dbW ? `${dbW.damage}${dmg !== 0 ? (dmg > 0 ? '+' : '') + dmg : ''} ${dbW.damageType}` : customW ? customW.damage ?? '—' : '—'
+        const ammoName = getAmmoName(activeWeapon)
+        const ammoCount = ammoName ? getAmmoCount(ammoName) : 0
 
         return (
           <div style={{ background: 'var(--teal-light)', border: '1px solid var(--teal)', borderTop: 'none', padding: '12px 14px' }}>
@@ -124,8 +155,17 @@ export default function WeaponsSection({ character: c }: Props) {
             </div>
             {dbW && FINESSE_WEAPONS.includes(activeWeapon) && (
               <button onClick={() => toggleFinesse(activeWeapon)} style={{ marginTop: 8, padding: '3px 10px', border: '1px solid var(--teal)', background: 'var(--white)', color: 'var(--teal2)', fontSize: 12, cursor: 'pointer', borderRadius: 2, fontFamily: 'inherit', fontWeight: 600 }}>
-                Using {(finesseChoices[activeWeapon] ?? 'str').toUpperCase()} (tap to switch)
+                Using {(finesseChoices[activeWeapon] ?? 'str').toUpperCase()} — tap to switch
               </button>
+            )}
+            {/* Ammo tracker */}
+            {ammoName && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(0,128,110,.25)' }}>
+                <span style={{ fontSize: 12, color: 'var(--teal2)', flex: 1, fontWeight: 500 }}>{ammoName}</span>
+                <button onClick={() => adjustAmmo(ammoName, -1)} style={{ width: 28, height: 28, border: '1px solid var(--teal)', background: 'var(--white)', cursor: 'pointer', fontSize: 15, borderRadius: 3, color: 'var(--teal2)', fontFamily: 'inherit', padding: 0 }}>−</button>
+                <span style={{ fontSize: 16, fontWeight: 700, color: ammoCount === 0 ? 'var(--red)' : 'var(--teal2)', minWidth: 28, textAlign: 'center' }}>{ammoCount}</span>
+                <button onClick={() => adjustAmmo(ammoName, 1)} style={{ width: 28, height: 28, border: '1px solid var(--teal)', background: 'var(--white)', cursor: 'pointer', fontSize: 15, borderRadius: 3, color: 'var(--teal2)', fontFamily: 'inherit', padding: 0 }}>+</button>
+              </div>
             )}
           </div>
         )

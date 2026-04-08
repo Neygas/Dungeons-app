@@ -17,7 +17,7 @@ import BottomSheet from '@/components/shared/BottomSheet'
 import Toast from '@/components/shared/Toast'
 import { CLASSES, XP_TABLE } from '@/data'
 
-const NAV_TABS = ['Stats', 'Spells', 'Combat', 'Gear', 'Info']
+const NAV_TABS = ['Stats', 'Spells', 'Combat', 'Gear']
 const SECTION_IDS = ['section-stats', 'section-spells', 'section-combat', 'section-gear']
 
 // ── Photo modal ────────────────────────────────────────────────────────────────
@@ -74,7 +74,6 @@ export default function CharacterSheetScreen() {
   }, [collapsed])
 
   const scrollToSection = (idx: number) => {
-    if (idx === 4) { setInfoInitialTab('about'); openSheet('info'); return }
     const el = document.getElementById(SECTION_IDS[idx])
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
@@ -92,7 +91,7 @@ export default function CharacterSheetScreen() {
     return (
       <div style={{ padding: 32, textAlign: 'center' }}>
         <div style={{ color: 'var(--text3)', marginBottom: 16 }}>Character not found.</div>
-        <button onClick={() => navigate('/characters')} style={{ color: 'var(--teal)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 14 }}>← Back to characters</button>
+        <button onClick={() => navigate('/characters')} style={{ color: 'var(--teal)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 14 }}>Back to characters</button>
       </div>
     )
   }
@@ -105,6 +104,7 @@ export default function CharacterSheetScreen() {
   const xpPct = xpRange > 0 ? Math.min(100, Math.max(0, Math.round((exp - thisXP) / xpRange * 100))) : 0
   const hasSpells = CLASSES[c.class]?.spellcasting !== null || (c.spells?.length ?? 0) > 0
   const photoUrl = c.photo_url
+  const initials = c.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
 
   return (
     <div ref={scrollRef} style={{ maxWidth: 600, margin: '0 auto', paddingBottom: 80, height: '100vh', overflowY: 'auto' }}>
@@ -113,44 +113,52 @@ export default function CharacterSheetScreen() {
 
         {collapsed ? (
           /* ── Collapsed header ── */
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 12px', height: 44, gap: 8 }}>
-            <button onClick={() => navigate('/characters')} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 13, fontWeight: 500, cursor: 'pointer', padding: '4px 2px', flexShrink: 0 }}>←</button>
-            {/* Avatar small */}
-            <div onClick={() => setShowPhotoModal(true)} style={{ width: 30, height: 30, borderRadius: '50%', overflow: 'hidden', border: '2px solid rgba(255,255,255,.4)', flexShrink: 0, cursor: 'pointer', background: 'rgba(255,255,255,.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              {photoUrl ? <img src={photoUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 14 }}>🧙</span>}
+          <div style={{ display: 'flex', alignItems: 'center', padding: '0 12px', height: 44, gap: 8 }}>
+            <button onClick={() => navigate('/characters')} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 13, fontWeight: 500, cursor: 'pointer', padding: '4px 2px', flexShrink: 0 }}>Back</button>
+            {/* Avatar small — tap for photo */}
+            <div onClick={() => setShowPhotoModal(true)} style={{ width: 30, height: 30, borderRadius: '50%', overflow: 'hidden', border: '2px solid rgba(255,255,255,.4)', flexShrink: 0, cursor: 'pointer', background: 'rgba(255,255,255,.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {photoUrl ? <img src={photoUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>{initials}</span>}
             </div>
-            <div style={{ flex: 1, fontSize: 14, fontWeight: 700, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</div>
-            <button
-              onClick={() => setEditMode(!editMode)}
-              style={{ background: editMode ? 'rgba(255,255,255,.25)' : 'none', border: editMode ? '1px solid rgba(255,255,255,.5)' : 'none', color: '#fff', fontSize: 16, cursor: 'pointer', padding: '3px 6px', borderRadius: 4, flexShrink: 0 }}
-            >✏️</button>
+            {/* Name — gold when inspired */}
+            <div style={{ flex: 1, fontSize: 14, fontWeight: 700, color: c.inspiration ? 'var(--gold)' : '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', transition: 'color .3s' }}>{c.name}</div>
+            {/* Info button */}
+            <button onClick={() => { setInfoInitialTab('about'); openSheet('info') }} style={{ background: 'rgba(255,255,255,.15)', border: '1px solid rgba(255,255,255,.3)', color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: '3px 8px', borderRadius: 4, flexShrink: 0, fontFamily: 'inherit' }}>Info</button>
           </div>
         ) : (
           /* ── Expanded header ── */
           <div>
             <div style={{ display: 'flex', alignItems: 'center', padding: '10px 14px', gap: 12 }}>
-              {/* Avatar large */}
+              {/* Avatar large — tap for photo */}
               <div onClick={() => setShowPhotoModal(true)} style={{ width: 60, height: 60, borderRadius: 8, overflow: 'hidden', border: '2px solid rgba(255,255,255,.5)', flexShrink: 0, cursor: 'pointer', background: 'rgba(255,255,255,.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                {photoUrl ? <img src={photoUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 28 }}>🧙</span>}
+                {photoUrl ? <img src={photoUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 20, fontWeight: 700, color: '#fff' }}>{initials}</span>}
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 18, fontWeight: 700, color: '#fff', lineHeight: 1.2 }}>{c.name}</div>
+                {/* Name — gold when inspired */}
+                <div style={{ fontSize: 18, fontWeight: 700, color: c.inspiration ? 'var(--gold)' : '#fff', lineHeight: 1.2, transition: 'color .3s' }}>{c.name}</div>
                 <div style={{ fontSize: 12, color: 'rgba(255,255,255,.8)', marginTop: 2 }}>Level {lvl} {c.race} {c.class}</div>
                 <div style={{ fontSize: 11, color: 'rgba(255,255,255,.65)', marginTop: 1 }}>{c.background} · {c.alignment}</div>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-end' }}>
-                <button onClick={() => navigate('/characters')} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,.85)', fontSize: 13, cursor: 'pointer', padding: '2px 0' }}>← Back</button>
-                <button
-                  onClick={() => setEditMode(!editMode)}
-                  style={{ background: editMode ? 'rgba(255,255,255,.25)' : 'rgba(255,255,255,.1)', border: editMode ? '1px solid rgba(255,255,255,.5)' : '1px solid rgba(255,255,255,.2)', color: '#fff', fontSize: 16, cursor: 'pointer', padding: '3px 8px', borderRadius: 4 }}
-                  title="Edit mode"
-                >✏️</button>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-end' }}>
+                <button onClick={() => navigate('/characters')} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,.85)', fontSize: 13, cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}>Back</button>
+                <button onClick={() => { setInfoInitialTab('about'); openSheet('info') }} style={{ background: 'rgba(255,255,255,.15)', border: '1px solid rgba(255,255,255,.3)', color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: '4px 10px', borderRadius: 4, fontFamily: 'inherit' }}>Info</button>
               </div>
             </div>
 
             {/* XP bar */}
-            <div style={{ background: 'rgba(0,0,0,.15)', height: 4, margin: '0 14px 10px', borderRadius: 2 }}>
-              <div style={{ background: 'rgba(255,255,255,.6)', height: 4, width: `${xpPct}%`, borderRadius: 2, transition: 'width .3s' }} />
+            <div style={{ margin: '0 14px 10px', position: 'relative' }}>
+              <div style={{ background: 'rgba(0,0,0,.25)', height: 6, borderRadius: 3, position: 'relative', overflow: 'hidden' }}>
+                {/* Track label when empty */}
+                {xpPct === 0 && (
+                  <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <span style={{ fontSize: 8, color: 'rgba(255,255,255,.4)', letterSpacing: 1, fontWeight: 600, textTransform: 'uppercase' }}>XP</span>
+                  </div>
+                )}
+                <div style={{ background: 'rgba(255,255,255,.7)', height: '100%', width: `${xpPct}%`, borderRadius: 3, transition: 'width .3s' }} />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 2 }}>
+                <span style={{ fontSize: 9, color: 'rgba(255,255,255,.5)' }}>Lvl {lvl} · {exp.toLocaleString()} XP</span>
+                {lvl < 20 && <span style={{ fontSize: 9, color: 'rgba(255,255,255,.5)' }}>{nextXP.toLocaleString()} XP</span>}
+              </div>
             </div>
           </div>
         )}
@@ -169,11 +177,13 @@ export default function CharacterSheetScreen() {
       </div>
 
       {/* Inspiration row */}
-      <div style={{ background: 'var(--white)', border: '1px solid var(--border)', padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span style={{ fontSize: 13, fontWeight: 500 }}>Inspiration</span>
+      <div style={{ background: c.inspiration ? '#fffbeb' : 'var(--white)', border: `1px solid ${c.inspiration ? 'var(--gold)' : 'var(--border)'}`, padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', transition: 'all .3s' }}>
+        <span style={{ fontSize: 13, fontWeight: c.inspiration ? 700 : 500, color: c.inspiration ? 'var(--gold)' : 'var(--text)', transition: 'color .3s' }}>
+          {c.inspiration ? 'Inspired!' : 'Inspiration'}
+        </span>
         <div
           onClick={() => useCharacterStore.getState().patchActiveCharacter({ inspiration: !c.inspiration })}
-          style={{ width: 44, height: 24, borderRadius: 12, border: `2px solid ${c.inspiration ? 'var(--teal2)' : 'var(--border2)'}`, background: c.inspiration ? 'var(--teal)' : 'var(--border)', cursor: 'pointer', position: 'relative', transition: 'all .2s', flexShrink: 0 }}
+          style={{ width: 44, height: 24, borderRadius: 12, border: `2px solid ${c.inspiration ? 'var(--gold)' : 'var(--border2)'}`, background: c.inspiration ? 'var(--gold)' : 'var(--border)', cursor: 'pointer', position: 'relative', transition: 'all .2s', flexShrink: 0 }}
         >
           <div style={{ position: 'absolute', top: 2, left: c.inspiration ? 18 : 2, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left .2s' }} />
         </div>
@@ -219,15 +229,12 @@ export default function CharacterSheetScreen() {
       <BottomSheet open={activeSheet === 'conditions'} onClose={closeSheet} title="Conditions">
         <ConditionsSheet character={c} />
       </BottomSheet>
-
       <BottomSheet open={activeSheet === 'tempHp'} onClose={closeSheet} title="Temporary HP">
         <TempHPSheet character={c} />
       </BottomSheet>
-
       <BottomSheet open={activeSheet === 'rest'} onClose={closeSheet} title="Take a Rest">
         <RestSheet character={c} />
       </BottomSheet>
-
       <BottomSheet open={activeSheet === 'info'} onClose={closeSheet} title="Character Info">
         <InfoSheet character={c} initialTab={infoInitialTab} />
       </BottomSheet>
@@ -236,18 +243,14 @@ export default function CharacterSheetScreen() {
 
       {/* Edit mode indicator */}
       {editMode && (
-        <div style={{ position: 'fixed', bottom: 16, left: '50%', transform: 'translateX(-50%)', background: 'var(--teal)', color: '#fff', padding: '8px 20px', borderRadius: 20, fontSize: 13, fontWeight: 600, zIndex: 90, boxShadow: '0 4px 16px rgba(0,0,0,.2)' }}>
-          Edit Mode — tap ✏️ to exit
+        <div onClick={() => setEditMode(false)} style={{ position: 'fixed', bottom: 16, left: '50%', transform: 'translateX(-50%)', background: 'var(--teal)', color: '#fff', padding: '9px 22px', borderRadius: 20, fontSize: 13, fontWeight: 600, zIndex: 90, boxShadow: '0 4px 16px rgba(0,0,0,.2)', cursor: 'pointer', userSelect: 'none' }}>
+          Edit Mode — tap here to exit
         </div>
       )}
 
       {/* Photo modal */}
       {showPhotoModal && (
-        <PhotoModal
-          current={c.photo_url ?? ''}
-          onSave={savePhoto}
-          onClose={() => setShowPhotoModal(false)}
-        />
+        <PhotoModal current={c.photo_url ?? ''} onSave={savePhoto} onClose={() => setShowPhotoModal(false)} />
       )}
     </div>
   )

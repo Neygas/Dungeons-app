@@ -3,47 +3,65 @@ import { saveBonus, fmtBonus } from '@/lib/calculations'
 import { AB_KEYS, AB_LABEL } from '@/data'
 import { useCharacterStore } from '@/store/characterStore'
 import { useUIStore } from '@/store/uiStore'
+import { useLongPress } from '@/lib/useLongPress'
 
 interface Props { character: Character }
 
-export default function SavingThrows({ character: c }: Props) {
+function SaveCell({ abKey, c, editMode }: { abKey: string; c: Character; editMode: boolean }) {
   const { patchActiveCharacter } = useCharacterStore()
-  const { editMode } = useUIStore()
+  const upper = abKey.toUpperCase()
+  const isProf = c.save_proficiencies.includes(upper)
+  const bonus = saveBonus(c, abKey)
 
-  const toggleProf = async (key: string) => {
+  const toggleProf = async () => {
     if (!editMode) return
-    const upper = key.toUpperCase()
-    const hasProf = c.save_proficiencies.includes(upper)
-    const next = hasProf
+    const next = isProf
       ? c.save_proficiencies.filter(s => s !== upper)
       : [...c.save_proficiencies, upper]
     await patchActiveCharacter({ save_proficiencies: next })
   }
 
+  const lp = useLongPress(toggleProf)
+
   return (
-    <div style={{ background: 'var(--white)', border: '1px solid var(--border)', borderTop: 'none' }}>
-      <div style={{ padding: '8px 14px', borderBottom: '1px solid var(--border)' }}>
-        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.5px' }}>Saving Throws</span>
+    <div
+      {...lp}
+      style={{
+        padding: '10px 4px',
+        textAlign: 'center',
+        cursor: editMode ? 'pointer' : 'default',
+        background: isProf ? 'var(--purple-light)' : undefined,
+        userSelect: 'none',
+      }}
+    >
+      <div style={{ fontSize: 18, fontWeight: 700, color: isProf ? 'var(--purple)' : bonus < 0 ? 'var(--text3)' : 'var(--text)' }}>
+        {fmtBonus(bonus)}
       </div>
-      {AB_KEYS.map((key, i) => {
-        const upper = key.toUpperCase()
-        const isProf = c.save_proficiencies.includes(upper)
-        const bonus = saveBonus(c, key)
-        return (
-          <div key={key} style={{ display: 'flex', alignItems: 'center', padding: '8px 14px', borderBottom: i < 5 ? '1px solid var(--border)' : 'none', gap: 10 }}>
-            <div
-              onClick={() => toggleProf(key)}
-              style={{ width: 14, height: 14, borderRadius: '50%', border: `2px solid ${isProf ? 'var(--purple)' : 'var(--border2)'}`, background: isProf ? 'var(--purple)' : 'var(--white)', cursor: editMode ? 'pointer' : 'default', flexShrink: 0 }}
-            />
-            <span style={{ flex: 1, fontSize: 14, color: isProf ? 'var(--purple)' : 'var(--text)', fontWeight: isProf ? 500 : 400 }}>
-              {AB_LABEL[key]} Save
-            </span>
-            <span style={{ fontSize: 14, fontWeight: 700, minWidth: 36, textAlign: 'right', color: isProf ? 'var(--purple)' : bonus < 0 ? 'var(--text3)' : 'var(--text)' }}>
-              {fmtBonus(bonus)}
-            </span>
+      <div style={{ fontSize: 9, color: isProf ? 'var(--purple)' : 'var(--text3)', fontWeight: 600, letterSpacing: '.3px', marginTop: 2, textTransform: 'uppercase' }}>
+        {(AB_LABEL as Record<string, string>)[abKey]} Save
+      </div>
+      {/* Proficiency dot */}
+      <div style={{ width: 6, height: 6, borderRadius: '50%', margin: '4px auto 0', background: isProf ? 'var(--purple)' : 'var(--border2)', transition: 'background .15s' }} />
+    </div>
+  )
+}
+
+export default function SavingThrows({ character: c }: Props) {
+  const { editMode } = useUIStore()
+
+  return (
+    <div>
+      <div style={{ background: 'var(--white)', border: '1px solid var(--border)', borderTop: 'none', padding: '8px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.5px' }}>Saving Throws</span>
+        {editMode && <span style={{ fontSize: 11, color: 'var(--purple)' }}>Long-press to toggle</span>}
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', border: '1px solid var(--border)', borderTop: 'none', background: 'var(--white)' }}>
+        {AB_KEYS.map((key, i) => (
+          <div key={key} style={{ borderRight: i < 5 ? '1px solid var(--border)' : 'none' }}>
+            <SaveCell abKey={key} c={c} editMode={editMode} />
           </div>
-        )
-      })}
+        ))}
+      </div>
     </div>
   )
 }
