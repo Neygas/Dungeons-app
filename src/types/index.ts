@@ -161,6 +161,7 @@ export interface Character {
   // Timestamps
   created_at: string
   updated_at: string
+  [key: string]: unknown
 }
 
 export type CharacterDraft = Omit<Character, 'id' | 'user_id' | 'created_at' | 'updated_at'>
