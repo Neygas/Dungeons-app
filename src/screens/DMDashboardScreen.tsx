@@ -281,6 +281,23 @@ export default function DMDashboardScreen() {
     return () => { unsubscribeAll() }
   }, [sessionId]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Fallback: re-fetch characters whenever player_character_ids changes
+  useEffect(() => {
+    if (!activeSession) return
+    const ids: string[] = activeSession.player_character_ids ?? []
+    if (ids.length === 0) return
+    const currentIds = playerCharacters.map(c => c.id)
+    const missing = ids.filter(id => !currentIds.includes(id))
+    if (missing.length === 0) return
+    import('@/lib/supabase').then(({ supabase }) => {
+      supabase.from('characters').select('*').in('id', missing).then(({ data }) => {
+        if (data && data.length > 0) {
+          useSessionStore.setState(s => ({ playerCharacters: [...s.playerCharacters, ...data] }))
+        }
+      })
+    })
+  }, [activeSession?.player_character_ids?.join(',')]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // Sync maxPerPlayer input when session loads
   useEffect(() => {
     if (activeSession?.loot_max_per_player) {
