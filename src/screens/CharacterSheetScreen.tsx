@@ -3,6 +3,8 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useCharacterStore } from '@/store/characterStore'
 import { useAuthStore } from '@/store/authStore'
 import { useUIStore } from '@/store/uiStore'
+import { useSessionStore } from '@/store/sessionStore'
+import { saveBonus } from '@/lib/calculations'
 import HPSection, { ConditionsSheet, TempHPSheet, RestSheet } from '@/components/character/HPSection'
 import CombatStats from '@/components/character/CombatStats'
 import AbilityScores from '@/components/character/AbilityScores'
@@ -44,11 +46,16 @@ export default function CharacterSheetScreen() {
   const { user } = useAuthStore()
   const { characters, activeCharacter, setActiveCharacter, fetchCharacters, loading } = useCharacterStore()
   const { editMode, setEditMode, activeSheet, openSheet, closeSheet } = useUIStore()
+  const { getJoinedSession, subscribeToSession, activeSession, logEntry } = useSessionStore()
   const [collapsed, setCollapsed] = useState(false)
   const [showPhotoModal, setShowPhotoModal] = useState(false)
   const [infoInitialTab, setInfoInitialTab] = useState<'about' | 'exp' | 'quick'>('about')
+  const [showConSave, setShowConSave] = useState(false)
+  const [conSaveDC, setConSaveDC] = useState(10)
+  const [conSaveDamage, setConSaveDamage] = useState(0)
   const scrollRef = useRef<HTMLDivElement>(null)
   const lastScrollY = useRef(0)
+  const prevHpRef = useRef<number | null>(null)
 
   useEffect(() => {
     if (user && characters.length === 0) fetchCharacters(user.id)
@@ -72,6 +79,29 @@ export default function CharacterSheetScreen() {
     el.addEventListener('scroll', onScroll, { passive: true })
     return () => el.removeEventListener('scroll', onScroll)
   }, [collapsed])
+
+  // Subscribe to session when character has a joined session
+  useEffect(() => {
+    if (!activeCharacter) return
+    const sessionId = getJoinedSession(activeCharacter.id)
+    if (!sessionId) return
+    const unsub = subscribeToSession(sessionId, activeCharacter.id)
+    return unsub
+  }, [activeCharacter?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Concentration save popup: detect HP decrease while concentrating
+  useEffect(() => {
+    if (!activeCharacter) return
+    const prev = prevHpRef.current
+    if (prev !== null && activeCharacter.concentration_spell && activeCharacter.hp < prev && activeCharacter.hp > 0) {
+      const damage = prev - activeCharacter.hp
+      const dc = Math.max(10, Math.floor(damage / 2))
+      setConSaveDamage(damage)
+      setConSaveDC(dc)
+      setShowConSave(true)
+    }
+    prevHpRef.current = activeCharacter.hp
+  }, [activeCharacter?.hp]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const scrollToSection = (idx: number) => {
     const el = document.getElementById(SECTION_IDS[idx])
@@ -103,11 +133,14 @@ export default function CharacterSheetScreen() {
   const xpRange = nextXP - thisXP
   const xpPct = xpRange > 0 ? Math.min(100, Math.max(0, Math.round((exp - thisXP) / xpRange * 100))) : 0
   const hasSpells = CLASSES[c.class]?.spellcasting !== null || (c.spells?.length ?? 0) > 0
+  const joinedSessionId = getJoinedSession(c.id)
+  const sessionTurnEntry = activeSession?.initiative[activeSession.current_turn] ?? null
+  const isTurn = !!activeSession?.combat_active && sessionTurnEntry?.characterId === c.id
   const photoUrl = c.photo_url
   const initials = c.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
 
   return (
-    <div ref={scrollRef} style={{ maxWidth: 600, margin: '0 auto', paddingBottom: 80, height: '100vh', overflowY: 'auto' }}>
+    <div ref={scrollRef} className={isTurn ? 'your-turn-pulse' : ''} style={{ maxWidth: 600, margin: '0 auto', paddingBottom: 80, height: '100vh', overflowY: 'auto', border: isTurn ? '2px solid var(--teal)' : 'none', transition: 'border-color .3s' }}>
       {/* Sticky header */}
       <div style={{ position: 'sticky', top: 0, zIndex: 100, background: 'var(--teal)' }}>
 
@@ -175,6 +208,35 @@ export default function CharacterSheetScreen() {
           })}
         </div>
       </div>
+
+      {/* Session banner */}
+      {joinedSessionId && (
+        <div style={{
+          background: isTurn ? 'var(--teal)' : 'var(--teal-light)',
+          borderBottom: `1px solid ${isTurn ? 'var(--teal2)' : 'var(--border)'}`,
+          padding: '8px 14px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          transition: 'background .3s',
+        }}>
+          <div>
+            <span style={{ fontSize: 12, fontWeight: 600, color: isTurn ? '#fff' : 'var(--teal2)' }}>
+              Session: <span style={{ letterSpacing: 1 }}>{joinedSessionId}</span>
+            </span>
+            {activeSession?.combat_active && sessionTurnEntry && (
+              <span style={{ fontSize: 11, color: isTurn ? 'rgba(255,255,255,.8)' : 'var(--text3)', marginLeft: 8 }}>
+                Turn: {sessionTurnEntry.name}
+              </span>
+            )}
+          </div>
+          {isTurn && (
+            <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', background: 'rgba(0,0,0,.2)', padding: '3px 10px', borderRadius: 4, letterSpacing: .5 }}>
+              YOUR TURN
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Inspiration row */}
       <div style={{ background: c.inspiration ? '#fffbeb' : 'var(--white)', border: `1px solid ${c.inspiration ? 'var(--gold)' : 'var(--border)'}`, padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', transition: 'all .3s' }}>
@@ -251,6 +313,48 @@ export default function CharacterSheetScreen() {
       {/* Photo modal */}
       {showPhotoModal && (
         <PhotoModal current={c.photo_url ?? ''} onSave={savePhoto} onClose={() => setShowPhotoModal(false)} />
+      )}
+
+      {/* Concentration save popup */}
+      {showConSave && c.concentration_spell && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.6)', zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+          <div style={{ background: 'var(--white)', borderRadius: 10, width: '100%', maxWidth: 340, padding: 22 }}>
+            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>Concentration Check</div>
+            <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 14 }}>
+              You took <strong>{conSaveDamage} damage</strong> while concentrating on <strong>{c.concentration_spell}</strong>.
+            </div>
+            <div style={{ background: 'var(--purple-light)', border: '1px solid var(--purple)', borderRadius: 6, padding: '10px 14px', marginBottom: 16, textAlign: 'center' }}>
+              <div style={{ fontSize: 12, color: 'var(--purple)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 4 }}>Constitution Save</div>
+              <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--purple)' }}>DC {conSaveDC}</div>
+              <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 4 }}>
+                Your CON save: {saveBonus(c, 'con') >= 0 ? '+' : ''}{saveBonus(c, 'con')} — roll a d20!
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={() => {
+                  const sid = getJoinedSession(c.id)
+                  if (sid) logEntry(sid, c.name, 'concentration', `${c.name} maintained concentration on ${c.concentration_spell} (DC ${conSaveDC})`, {}, c.id)
+                  setShowConSave(false)
+                }}
+                style={{ flex: 1, padding: 11, background: 'var(--teal)', color: '#fff', border: 'none', fontSize: 14, fontWeight: 600, cursor: 'pointer', borderRadius: 3, fontFamily: 'inherit' }}
+              >
+                Succeeded
+              </button>
+              <button
+                onClick={async () => {
+                  const sid = getJoinedSession(c.id)
+                  if (sid) await logEntry(sid, c.name, 'concentration', `${c.name} lost concentration on ${c.concentration_spell} (DC ${conSaveDC})`, {}, c.id)
+                  await useCharacterStore.getState().patchActiveCharacter({ concentration_spell: null })
+                  setShowConSave(false)
+                }}
+                style={{ flex: 1, padding: 11, background: 'var(--red)', color: '#fff', border: 'none', fontSize: 14, fontWeight: 600, cursor: 'pointer', borderRadius: 3, fontFamily: 'inherit' }}
+              >
+                Failed — Drop
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

@@ -180,6 +180,7 @@ export interface InitiativeEntry {
   name: string
   initiative: number
   isPlayer: boolean
+  characterId?: string
   hp?: number
   maxHp?: number
 }
@@ -190,6 +191,14 @@ export interface ShopItem {
   price: number
   category: string
   desc?: string
+}
+
+export interface LootItem {
+  id: string
+  name: string
+  desc?: string
+  quantity: number
+  category?: string
 }
 
 export interface Session {
@@ -203,8 +212,26 @@ export interface Session {
   combat_active: boolean
   shop_items: ShopItem[]
   shop_open: boolean
+  loot_pool: LootItem[]
+  loot_open: boolean
+  loot_max_per_player: number
+  loot_claims: Record<string, string[]>
   dm_notes: string
   active: boolean
+  created_at: string
+}
+
+// ===== COMBAT LOG =====
+export type CombatLogType = 'hp_change' | 'spell_cast' | 'attack' | 'item_use' | 'condition' | 'death_save' | 'rest' | 'concentration' | 'note' | 'loot' | 'shop'
+
+export interface CombatLogEntry {
+  id: string
+  session_id: string
+  character_id?: string
+  character_name: string
+  type: CombatLogType
+  description: string
+  details: Record<string, unknown>
   created_at: string
 }
 

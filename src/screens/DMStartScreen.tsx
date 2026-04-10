@@ -36,6 +36,10 @@ export default function DMStartScreen() {
         combat_active: false,
         shop_items: [],
         shop_open: false,
+        loot_pool: [],
+        loot_open: false,
+        loot_max_per_player: 1,
+        loot_claims: {},
         dm_notes: '',
         active: true,
       })
