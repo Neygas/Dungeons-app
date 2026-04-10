@@ -105,11 +105,25 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   subscribeAll: (sessionId) => {
     get().unsubscribeAll()
 
-    // Session changes
+    // Session changes — also re-fetch any newly joined player characters
     const sessionCh = supabase
       .channel(`session:${sessionId}`)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'sessions', filter: `id=eq.${sessionId}` },
-        (payload) => set({ activeSession: payload.new as Session }))
+        async (payload) => {
+          const newSession = payload.new as Session
+          set({ activeSession: newSession })
+          const newIds: string[] = newSession.player_character_ids ?? []
+          const currentIds = get().playerCharacters.map(c => c.id)
+          const missing = newIds.filter(id => !currentIds.includes(id))
+          if (missing.length > 0) {
+            const { data } = await supabase.from('characters').select('*').in('id', missing)
+            if (data) set(s => ({ playerCharacters: [...s.playerCharacters, ...data] }))
+          }
+          // Also remove characters that left
+          if (newIds.length < currentIds.length) {
+            set(s => ({ playerCharacters: s.playerCharacters.filter(c => newIds.includes(c.id)) }))
+          }
+        })
       .subscribe()
 
     // Character changes — fetch fresh on any update
