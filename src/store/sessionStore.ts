@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { Character, Session, CombatLogEntry, CombatLogType, LootItem, ShopItem, InitiativeEntry } from '@/types'
 import { supabase } from '@/lib/supabase'
+import { useCharacterStore } from '@/store/characterStore'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 
 const SESSION_KEY = 'dnd_active_sessions' // localStorage key: JSON map of charId → sessionId
@@ -67,6 +68,12 @@ function saveJoinedSessions(map: Record<string, string>) {
   localStorage.setItem(SESSION_KEY, JSON.stringify(map))
 }
 
+// Deduplicate a character array by id
+function dedupeChars(chars: Character[]): Character[] {
+  const seen = new Set<string>()
+  return chars.filter(c => { if (seen.has(c.id)) return false; seen.add(c.id); return true })
+}
+
 export const useSessionStore = create<SessionState>((set, get) => ({
   activeSession: null,
   playerCharacters: [],
@@ -98,14 +105,14 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       .order('created_at', { ascending: false })
       .limit(100)
 
-    set({ activeSession: session as Session, playerCharacters: chars, combatLog: (log ?? []) as CombatLogEntry[], loading: false })
+    set({ activeSession: session as Session, playerCharacters: dedupeChars(chars), combatLog: (log ?? []) as CombatLogEntry[], loading: false })
   },
 
   // ── Subscribe to realtime (DM) ──────────────────────────────────────────────
   subscribeAll: (sessionId) => {
     get().unsubscribeAll()
 
-    // Session changes — also re-fetch any newly joined player characters
+    // Session changes — re-fetch newly joined player characters, deduplicated
     const sessionCh = supabase
       .channel(`session:${sessionId}`)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'sessions', filter: `id=eq.${sessionId}` },
@@ -117,20 +124,20 @@ export const useSessionStore = create<SessionState>((set, get) => ({
           const missing = newIds.filter(id => !currentIds.includes(id))
           if (missing.length > 0) {
             const { data } = await supabase.from('characters').select('*').in('id', missing)
-            if (data) set(s => ({ playerCharacters: [...s.playerCharacters, ...data] }))
+            if (data) set(s => ({ playerCharacters: dedupeChars([...s.playerCharacters, ...(data as Character[])]) }))
           }
-          // Also remove characters that left
+          // Remove characters that left
           if (newIds.length < currentIds.length) {
             set(s => ({ playerCharacters: s.playerCharacters.filter(c => newIds.includes(c.id)) }))
           }
         })
       .subscribe()
 
-    // Character changes — fetch fresh on any update
+    // Character changes — update matching characters in list
     const playersCh = supabase
       .channel(`players:${sessionId}`)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'characters' },
-        async (payload) => {
+        (payload) => {
           const updated = payload.new as Character
           set(s => {
             if (!s.playerCharacters.some(c => c.id === updated.id)) return s
@@ -194,19 +201,36 @@ export const useSessionStore = create<SessionState>((set, get) => ({
 
   getJoinedSession: (characterId) => get().joinedSessions[characterId] ?? null,
 
-  // ── Player subscribes to session (for turn/shop/loot updates) ──────────────
-  subscribeToSession: (sessionId, _characterId) => {
-    const ch = supabase
-      .channel(`player-session:${sessionId}`)
+  // ── Player subscribes to session + own character changes ───────────────────
+  subscribeToSession: (sessionId, characterId) => {
+    // Session updates (turn, shop, loot, etc.)
+    const sessionCh = supabase
+      .channel(`player-session:${sessionId}-${characterId}`)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'sessions', filter: `id=eq.${sessionId}` },
         (payload) => set({ activeSession: payload.new as Session }))
       .subscribe()
 
+    // Own character updates pushed by DM (conditions, HP, etc.)
+    const charCh = supabase
+      .channel(`player-char:${characterId}`)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'characters', filter: `id=eq.${characterId}` },
+        (payload) => {
+          const updated = payload.new as Character
+          const cs = useCharacterStore.getState()
+          // Update both the characters list and activeCharacter
+          cs.setActiveCharacter(updated)
+        })
+      .subscribe()
+
+    // Initial session fetch
     supabase.from('sessions').select('*').eq('id', sessionId).single().then(({ data }) => {
       if (data) set({ activeSession: data as Session })
     })
 
-    return () => { supabase.removeChannel(ch) }
+    return () => {
+      supabase.removeChannel(sessionCh)
+      supabase.removeChannel(charCh)
+    }
   },
 
   // ── DM patches a player character ──────────────────────────────────────────
@@ -271,7 +295,6 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     claims[character.id] = [...existing, itemName]
     await get().patchSession({ loot_claims: claims })
 
-    // Add to character inventory
     const inv = character.inventory ?? []
     const found = inv.find(i => i.name === itemName)
     const newInv = found

@@ -4,6 +4,7 @@ import { WEAPON_DB, WEAPON_CATEGORIES, FINESSE_WEAPONS, AMMO_MAP } from '@/data'
 import { mod, profBonus, fmtBonus } from '@/lib/calculations'
 import { useCharacterStore } from '@/store/characterStore'
 import { useUIStore } from '@/store/uiStore'
+import { useSessionStore } from '@/store/sessionStore'
 import AddModal from '@/components/shared/AddModal'
 import type { Weapon } from '@/types'
 
@@ -40,6 +41,7 @@ function dmgBonus(c: Character, w: Weapon, finesseChoice?: 'str' | 'dex'): numbe
 export default function WeaponsSection({ character: c }: Props) {
   const { patchActiveCharacter } = useCharacterStore()
   const { showToast, editMode } = useUIStore()
+  const { logEntry, getJoinedSession } = useSessionStore()
   const [showAddModal, setShowAddModal] = useState(false)
   const [dbFilter, setDbFilter] = useState('All')
   const [dbQuery, setDbQuery] = useState('')
@@ -107,6 +109,21 @@ export default function WeaponsSection({ character: c }: Props) {
     await patchActiveCharacter({ weapon_finesse_choices: { ...finesseChoices, [name]: next } })
   }
 
+  const useWeapon = async () => {
+    if (!activeWeapon) return
+    const sid = getJoinedSession(c.id)
+    const ammoName = getAmmoName(activeWeapon)
+    if (ammoName) {
+      const count = getAmmoCount(ammoName)
+      if (count <= 0) { showToast('No ammo!'); return }
+      await adjustAmmo(ammoName, -1)
+      if (sid) await logEntry(sid, c.name, 'attack', `${c.name} attacked with ${activeWeapon} (${ammoName}: ${count - 1} remaining)`, {}, c.id)
+    } else {
+      if (sid) await logEntry(sid, c.name, 'attack', `${c.name} attacked with ${activeWeapon}`, {}, c.id)
+    }
+    showToast(`Attack with ${activeWeapon}`)
+  }
+
   const addCustom = async () => {
     if (!customName.trim()) return
     const w = { name: customName.trim(), damage: customDamage, damageType: customType, isCustom: true }
@@ -158,6 +175,13 @@ export default function WeaponsSection({ character: c }: Props) {
                 Using {(finesseChoices[activeWeapon] ?? 'str').toUpperCase()} — tap to switch
               </button>
             )}
+            {/* Use / Attack button */}
+            <button
+              onClick={useWeapon}
+              style={{ marginTop: 10, display: 'block', width: '100%', padding: '9px', background: 'var(--teal)', color: '#fff', border: 'none', fontSize: 14, fontWeight: 700, cursor: 'pointer', borderRadius: 2, fontFamily: 'inherit', letterSpacing: '.3px' }}
+            >
+              Use — Attack
+            </button>
             {/* Ammo tracker */}
             {ammoName && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(0,128,110,.25)' }}>

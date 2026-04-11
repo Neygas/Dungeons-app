@@ -22,7 +22,16 @@ export default function HPSection({ character: c }: Props) {
     if (!n || n <= 0) return
     showToast(`-${n} HP`)
     setAdjVal('')
-    await patchActiveCharacter({ hp: Math.max(0, c.hp - n) })
+    const newHp = Math.max(0, c.hp - n)
+    const updates: Partial<Character> = { hp: newHp }
+    // Always reset death saves when dropping to 0 so the interface always appears
+    if (newHp === 0) {
+      updates.death_successes = 0
+      updates.death_failures = 0
+      updates.is_stable = false
+      updates.is_dead = false
+    }
+    await patchActiveCharacter(updates)
   }
 
   const applyHeal = async () => {

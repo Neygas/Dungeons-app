@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/store/authStore'
 import { supabase } from '@/lib/supabase'
+import type { Session } from '@/types'
 
 function generateCode() {
   const words = ['SWORD', 'FLAME', 'ROGUE', 'DRUID', 'OAKEN', 'STEEL', 'MAGIC', 'QUEST', 'BLADE', 'STORM']
@@ -12,9 +13,26 @@ export default function DMStartScreen() {
   const navigate = useNavigate()
   const { user, signOut } = useAuthStore()
   const [campaignName, setCampaignName] = useState('')
-  const [joinCode, setJoinCode] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [activeSessions, setActiveSessions] = useState<Session[]>([])
+  const [sessionsLoading, setSessionsLoading] = useState(true)
+
+  // Load active sessions for this DM
+  useEffect(() => {
+    if (!user) return
+    setSessionsLoading(true)
+    supabase
+      .from('sessions')
+      .select('*')
+      .eq('dm_user_id', user.id)
+      .eq('active', true)
+      .order('created_at', { ascending: false })
+      .then(({ data }) => {
+        setActiveSessions((data ?? []) as Session[])
+        setSessionsLoading(false)
+      })
+  }, [user])
 
   const handleCreate = async () => {
     if (!user || !campaignName.trim()) return
@@ -54,12 +72,9 @@ export default function DMStartScreen() {
     }
   }
 
-  const handleResume = async () => {
-    if (!joinCode.trim()) return
-    const code = joinCode.trim().toUpperCase()
-    const { data } = await supabase.from('sessions').select('id').eq('id', code).eq('dm_user_id', user!.id).single()
-    if (data) navigate(`/dm/${code}`)
-    else setError('Session not found or you are not the DM.')
+  const handleEndSession = async (sessionId: string) => {
+    await supabase.from('sessions').update({ active: false }).eq('id', sessionId)
+    setActiveSessions(prev => prev.filter(s => s.id !== sessionId))
   }
 
   return (
@@ -75,14 +90,48 @@ export default function DMStartScreen() {
           <div style={{ padding: '10px 14px', marginBottom: 16, borderRadius: 2, fontSize: 13, background: '#fde8e8', color: 'var(--red)', border: '1px solid var(--red)' }}>{error}</div>
         )}
 
+        {/* Active sessions */}
+        {!sessionsLoading && activeSessions.length > 0 && (
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ background: 'var(--white)', border: '1px solid var(--border)', padding: '10px 16px' }}>
+              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.5px' }}>Active Sessions</span>
+            </div>
+            {activeSessions.map(s => (
+              <div key={s.id} style={{ background: 'var(--white)', border: '1px solid var(--border)', borderTop: 'none', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 15, fontWeight: 700 }}>{s.campaign_name}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 2 }}>
+                    Code: <span style={{ fontWeight: 700, letterSpacing: 1, color: 'var(--teal2)' }}>{s.id}</span>
+                    {' · '}{(s.player_character_ids ?? []).length} player{(s.player_character_ids ?? []).length !== 1 ? 's' : ''}
+                    {s.combat_active && <span style={{ marginLeft: 6, color: 'var(--red)', fontWeight: 600 }}>· In combat</span>}
+                  </div>
+                </div>
+                <button
+                  onClick={() => navigate(`/dm/${s.id}`)}
+                  style={{ padding: '7px 16px', background: 'var(--teal)', color: '#fff', border: 'none', fontSize: 13, fontWeight: 600, cursor: 'pointer', borderRadius: 2, fontFamily: 'inherit', whiteSpace: 'nowrap' }}
+                >
+                  Rejoin
+                </button>
+                <button
+                  onClick={() => handleEndSession(s.id)}
+                  style={{ padding: '7px 10px', background: 'var(--white)', color: 'var(--red)', border: '1px solid var(--red)', fontSize: 12, cursor: 'pointer', borderRadius: 2, fontFamily: 'inherit', whiteSpace: 'nowrap' }}
+                >
+                  End
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* New campaign */}
-        <div style={{ background: 'var(--white)', border: '1px solid var(--border)', padding: 16, marginBottom: 12 }}>
+        <div style={{ background: 'var(--white)', border: '1px solid var(--border)', padding: 16 }}>
           <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 12 }}>New Campaign</div>
           <div style={{ marginBottom: 12 }}>
             <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 5 }}>Campaign Name</label>
             <input
               value={campaignName}
               onChange={e => setCampaignName(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleCreate()}
               placeholder="The Lost Mines of Phandelver"
               style={{ width: '100%', border: 'none', borderBottom: '1px solid var(--border2)', background: 'transparent', padding: '7px 4px', fontSize: 15, color: 'var(--text)', outline: 'none', fontFamily: 'inherit' }}
             />
@@ -92,27 +141,8 @@ export default function DMStartScreen() {
             disabled={loading || !campaignName.trim()}
             style={{ display: 'block', width: '100%', padding: 13, background: 'var(--teal)', color: '#fff', border: '1px solid var(--teal2)', fontSize: 15, fontWeight: 600, cursor: 'pointer', borderRadius: 2, fontFamily: 'inherit', opacity: (loading || !campaignName.trim()) ? 0.6 : 1 }}
           >
-            {loading ? 'Creating...' : 'Start Session'}
+            {loading ? 'Creating...' : 'Start New Session'}
           </button>
-        </div>
-
-        {/* Resume session */}
-        <div style={{ background: 'var(--white)', border: '1px solid var(--border)', padding: 16 }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 12 }}>Resume Session</div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <input
-              value={joinCode}
-              onChange={e => setJoinCode(e.target.value)}
-              placeholder="Session code"
-              style={{ flex: 1, border: 'none', borderBottom: '1px solid var(--border2)', background: 'transparent', padding: '7px 4px', fontSize: 15, color: 'var(--text)', outline: 'none', fontFamily: 'inherit' }}
-            />
-            <button
-              onClick={handleResume}
-              style={{ padding: '7px 16px', background: 'var(--white)', color: 'var(--teal)', border: '1px solid var(--teal)', fontSize: 13, fontWeight: 600, cursor: 'pointer', borderRadius: 2, fontFamily: 'inherit', whiteSpace: 'nowrap' }}
-            >
-              Resume
-            </button>
-          </div>
         </div>
       </div>
     </div>

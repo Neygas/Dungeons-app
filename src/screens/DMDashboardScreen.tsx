@@ -52,7 +52,14 @@ function PlayerCard({ char, sessionId, isTurn }: { char: Character; sessionId: s
     if (isNaN(num)) return
     setApplying(true)
     const newHp = Math.min(char.max_hp, Math.max(0, char.hp + num))
-    await dmPatchCharacter(char.id, { hp: newHp })
+    const hpUpdates: Partial<Character> = { hp: newHp }
+    if (newHp === 0) {
+      hpUpdates.death_successes = 0
+      hpUpdates.death_failures = 0
+      hpUpdates.is_stable = false
+      hpUpdates.is_dead = false
+    }
+    await dmPatchCharacter(char.id, hpUpdates)
     const desc = num < 0
       ? `${char.name} took ${Math.abs(num)} damage (${char.hp} → ${newHp} HP)`
       : `${char.name} healed ${num} HP (${char.hp} → ${newHp} HP)`
@@ -254,6 +261,7 @@ export default function DMDashboardScreen() {
   } = useSessionStore()
 
   const [tab, setTab] = useState<Tab>('players')
+  const [detailChar, setDetailChar] = useState<Character | null>(null)
 
   // Initiative setup
   const [playerInits, setPlayerInits] = useState<Record<string, string>>({})
@@ -280,23 +288,6 @@ export default function DMDashboardScreen() {
     }
     return () => { unsubscribeAll() }
   }, [sessionId]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Fallback: re-fetch characters whenever player_character_ids changes
-  useEffect(() => {
-    if (!activeSession) return
-    const ids: string[] = activeSession.player_character_ids ?? []
-    if (ids.length === 0) return
-    const currentIds = playerCharacters.map(c => c.id)
-    const missing = ids.filter(id => !currentIds.includes(id))
-    if (missing.length === 0) return
-    import('@/lib/supabase').then(({ supabase }) => {
-      supabase.from('characters').select('*').in('id', missing).then(({ data }) => {
-        if (data && data.length > 0) {
-          useSessionStore.setState(s => ({ playerCharacters: [...s.playerCharacters, ...data] }))
-        }
-      })
-    })
-  }, [activeSession?.player_character_ids?.join(',')]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Sync maxPerPlayer input when session loads
   useEffect(() => {
@@ -471,7 +462,17 @@ export default function DMDashboardScreen() {
           ) : (
             playerCharacters.map(char => {
               const isTurn = s.combat_active && currentEntry?.characterId === char.id
-              return <PlayerCard key={char.id} char={char} sessionId={s.id} isTurn={isTurn} />
+              return (
+                <div key={char.id}>
+                  <PlayerCard char={char} sessionId={s.id} isTurn={isTurn} />
+                  <button
+                    onClick={() => setDetailChar(char)}
+                    style={{ display: 'block', width: '100%', padding: '6px 14px', background: 'var(--bg)', border: '1px solid var(--border)', borderTop: 'none', fontSize: 11, color: 'var(--teal2)', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit', fontWeight: 500 }}
+                  >
+                    View details →
+                  </button>
+                </div>
+              )
             })
           )}
         </div>
@@ -767,6 +768,129 @@ export default function DMDashboardScreen() {
           />
         </div>
       )}
+
+      {/* ── Player Detail Modal ──────────────────────────────────────────────────── */}
+      {detailChar && (() => {
+        // Keep in sync with latest data from store
+        const char = playerCharacters.find(c => c.id === detailChar.id) ?? detailChar
+        const { dmPatchCharacter: dmp } = useSessionStore.getState()
+        const ac = calcArmorAC(char)
+        const pp = passivePerception(char)
+        const hpPct = char.max_hp > 0 ? char.hp / char.max_hp : 1
+
+        return (
+          <div
+            onClick={e => { if (e.target === e.currentTarget) setDetailChar(null) }}
+            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.55)', zIndex: 200, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}
+          >
+            <div style={{ background: 'var(--white)', width: '100%', maxWidth: 600, borderRadius: '14px 14px 0 0', maxHeight: '88vh', overflowY: 'auto' }}>
+              {/* Handle */}
+              <div style={{ padding: '12px 16px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div>
+                  <div style={{ fontSize: 18, fontWeight: 700, color: char.inspiration ? 'var(--gold)' : 'var(--text)' }}>{char.name}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text3)' }}>Level {char.level} {char.race} {char.class}</div>
+                </div>
+                <button onClick={() => setDetailChar(null)} style={{ width: 30, height: 30, borderRadius: '50%', border: 'none', background: 'var(--bg)', cursor: 'pointer', fontSize: 16, color: 'var(--text2)' }}>✕</button>
+              </div>
+
+              {/* Inspiration button */}
+              <div style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10, borderBottom: '1px solid var(--border)' }}>
+                <button
+                  onClick={() => dmp(char.id, { inspiration: !char.inspiration })}
+                  style={{
+                    flex: 1, padding: '10px 16px',
+                    background: char.inspiration ? 'var(--gold)' : 'var(--white)',
+                    border: `2px solid ${char.inspiration ? 'var(--gold)' : 'var(--border2)'}`,
+                    color: char.inspiration ? '#fff' : 'var(--text2)',
+                    fontSize: 14, fontWeight: 700, cursor: 'pointer', borderRadius: 4, fontFamily: 'inherit',
+                    transition: 'all .2s',
+                  }}
+                >
+                  {char.inspiration ? 'Inspired! — Tap to remove' : 'Grant Inspiration'}
+                </button>
+              </div>
+
+              {/* Stats grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', borderBottom: '1px solid var(--border)' }}>
+                {[
+                  { label: 'HP', value: `${char.hp}/${char.max_hp}`, color: hpColor(hpPct) },
+                  { label: 'AC', value: String(ac) },
+                  { label: 'PP', value: String(pp) },
+                  { label: 'Speed', value: '30ft' },
+                ].map((stat, i) => (
+                  <div key={stat.label} style={{ padding: '10px 8px', textAlign: 'center', borderRight: i < 3 ? '1px solid var(--border)' : 'none' }}>
+                    <div style={{ fontSize: 16, fontWeight: 700, color: stat.color ?? 'var(--text)' }}>{stat.value}</div>
+                    <div style={{ fontSize: 10, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.5px', marginTop: 2 }}>{stat.label}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Ability scores */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', borderBottom: '1px solid var(--border)' }}>
+                {(['str', 'dex', 'con', 'int', 'wis', 'cha'] as const).map((ab, i) => {
+                  const score = char[ab] as number
+                  const m = Math.floor((score - 10) / 2)
+                  return (
+                    <div key={ab} style={{ padding: '8px 4px', textAlign: 'center', borderRight: i < 5 ? '1px solid var(--border)' : 'none' }}>
+                      <div style={{ fontSize: 15, fontWeight: 700 }}>{score}</div>
+                      <div style={{ fontSize: 12, color: 'var(--teal2)', fontWeight: 600 }}>{m >= 0 ? '+' : ''}{m}</div>
+                      <div style={{ fontSize: 9, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.3px' }}>{ab}</div>
+                    </div>
+                  )
+                })}
+              </div>
+
+              {/* Conditions */}
+              <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 8 }}>Conditions</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {CONDITIONS.map(cond => {
+                    const active = char.conditions?.includes(cond)
+                    return (
+                      <button
+                        key={cond}
+                        onClick={() => {
+                          const next = active
+                            ? (char.conditions ?? []).filter(c => c !== cond)
+                            : [...(char.conditions ?? []), cond]
+                          dmp(char.id, { conditions: next })
+                        }}
+                        style={{ padding: '4px 10px', border: `1px solid ${active ? '#92400e' : 'var(--border2)'}`, background: active ? '#fef3c7' : 'var(--white)', color: active ? '#92400e' : 'var(--text2)', fontSize: 12, fontWeight: active ? 700 : 400, cursor: 'pointer', borderRadius: 3, fontFamily: 'inherit' }}
+                      >
+                        {cond}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Concentration */}
+              {char.concentration_spell && (
+                <div style={{ padding: '10px 16px', background: 'var(--purple-light)', borderBottom: '1px solid var(--border)' }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--purple)' }}>Concentrating: {char.concentration_spell}</span>
+                  <button onClick={() => dmp(char.id, { concentration_spell: null })} style={{ marginLeft: 10, fontSize: 11, color: 'var(--red)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>Drop</button>
+                </div>
+              )}
+
+              {/* Inventory */}
+              {(char.inventory ?? []).length > 0 && (
+                <div style={{ padding: '12px 16px' }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 8 }}>Inventory</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {char.inventory.map(item => (
+                      <span key={item.name} style={{ fontSize: 12, background: 'var(--bg)', border: '1px solid var(--border)', padding: '3px 8px', borderRadius: 3 }}>
+                        {item.name} ×{item.quantity}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div style={{ height: 20 }} />
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }

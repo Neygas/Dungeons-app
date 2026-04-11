@@ -3,6 +3,7 @@ import type { Character, InventoryItem } from '@/types'
 import { GEAR_DB, GEAR_CATEGORIES } from '@/data'
 import { useCharacterStore } from '@/store/characterStore'
 import { useUIStore } from '@/store/uiStore'
+import { useSessionStore } from '@/store/sessionStore'
 import AddModal from '@/components/shared/AddModal'
 
 interface Props { character: Character }
@@ -10,11 +11,15 @@ interface Props { character: Character }
 export default function InventorySection({ character: c }: Props) {
   const { patchActiveCharacter } = useCharacterStore()
   const { showToast, editMode } = useUIStore()
+  const { logEntry, getJoinedSession } = useSessionStore()
   const [showAddModal, setShowAddModal] = useState(false)
   const [dbFilter, setDbFilter] = useState('All')
   const [dbQuery, setDbQuery] = useState('')
   const [customName, setCustomName] = useState('')
   const [showCustom, setShowCustom] = useState(false)
+  // Item use state
+  const [useItem, setUseItem] = useState<InventoryItem | null>(null)
+  const [useQty, setUseQty] = useState('1')
 
   const adjustQty = async (name: string, delta: number) => {
     const next = (c.inventory ?? []).map(item =>
@@ -42,6 +47,18 @@ export default function InventorySection({ character: c }: Props) {
     else { await patchActiveCharacter({ inventory: [...(c.inventory ?? []), { name: customName.trim(), quantity: 1 }] }) }
     showToast(`${customName.trim()} added`)
     setCustomName(''); setShowCustom(false); setShowAddModal(false)
+  }
+
+  const confirmUseItem = async () => {
+    if (!useItem) return
+    const qty = Math.max(1, parseInt(useQty) || 1)
+    const clamped = Math.min(qty, useItem.quantity)
+    await adjustQty(useItem.name, -clamped)
+    const sid = getJoinedSession(c.id)
+    if (sid) await logEntry(sid, c.name, 'item_use', `${c.name} used ${clamped}× ${useItem.name}`, { quantity: clamped }, c.id)
+    showToast(`Used ${clamped}× ${useItem.name}`)
+    setUseItem(null)
+    setUseQty('1')
   }
 
   const setCurrency = async (field: 'pp' | 'gp' | 'ep' | 'sp' | 'cp', val: string) => {
@@ -73,6 +90,12 @@ export default function InventorySection({ character: c }: Props) {
             <div style={{ fontSize: 14 }}>{item.name}</div>
             {item.cost && <div style={{ fontSize: 11, color: 'var(--text3)' }}>{item.cost}</div>}
           </div>
+          <button
+            onClick={() => { setUseItem(item); setUseQty('1') }}
+            style={{ padding: '4px 9px', border: '1px solid var(--teal)', background: 'var(--teal-light)', fontSize: 12, cursor: 'pointer', borderRadius: 2, fontFamily: 'inherit', color: 'var(--teal2)', fontWeight: 600 }}
+          >
+            Use
+          </button>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <button onClick={() => adjustQty(item.name, -1)} style={{ width: 28, height: 28, border: '1px solid var(--border2)', background: 'var(--white)', cursor: 'pointer', fontSize: 16, borderRadius: 2, color: 'var(--text3)', fontFamily: 'inherit', padding: 0 }}>−</button>
             <span style={{ fontSize: 15, fontWeight: 700, minWidth: 24, textAlign: 'center' }}>{item.quantity}</span>
@@ -83,6 +106,25 @@ export default function InventorySection({ character: c }: Props) {
           )}
         </div>
       ))}
+
+      {/* Use item modal */}
+      {useItem && (
+        <div onClick={e => { if (e.target === e.currentTarget) setUseItem(null) }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+          <div style={{ background: 'var(--white)', borderRadius: 10, width: '100%', maxWidth: 320, padding: 20 }}>
+            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>Use {useItem.name}</div>
+            <div style={{ fontSize: 13, color: 'var(--text3)', marginBottom: 16 }}>You have {useItem.quantity}. How many do you want to use?</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+              <button onClick={() => setUseQty(q => String(Math.max(1, (parseInt(q) || 1) - 1)))} style={{ width: 36, height: 36, border: '1px solid var(--border2)', background: 'var(--white)', cursor: 'pointer', fontSize: 18, borderRadius: 2, fontFamily: 'inherit' }}>−</button>
+              <input type="number" min="1" max={useItem.quantity} value={useQty} onChange={e => setUseQty(e.target.value)} style={{ flex: 1, border: '1px solid var(--border2)', padding: '8px', fontSize: 20, fontWeight: 700, textAlign: 'center', fontFamily: 'inherit', borderRadius: 2, outline: 'none', color: 'var(--text)', background: 'var(--white)' }} />
+              <button onClick={() => setUseQty(q => String(Math.min(useItem.quantity, (parseInt(q) || 1) + 1)))} style={{ width: 36, height: 36, border: '1px solid var(--border2)', background: 'var(--white)', cursor: 'pointer', fontSize: 18, borderRadius: 2, fontFamily: 'inherit' }}>+</button>
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={confirmUseItem} style={{ flex: 1, padding: 11, background: 'var(--teal)', color: '#fff', border: 'none', fontSize: 14, fontWeight: 600, cursor: 'pointer', borderRadius: 3, fontFamily: 'inherit' }}>Confirm</button>
+              <button onClick={() => setUseItem(null)} style={{ flex: 1, padding: 11, background: 'var(--white)', color: 'var(--text2)', border: '1px solid var(--border2)', fontSize: 14, cursor: 'pointer', borderRadius: 3, fontFamily: 'inherit' }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Add item modal */}
       <AddModal open={showAddModal} onClose={() => { setShowAddModal(false); setShowCustom(false) }} title="Add Item">
