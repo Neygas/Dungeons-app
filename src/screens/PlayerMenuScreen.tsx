@@ -315,26 +315,37 @@ export default function PlayerMenuScreen() {
                   <div style={{ textAlign: 'center', color: 'var(--text3)', fontSize: 14, padding: 20 }}>No items available.</div>
                 )}
                 {items.map(item => {
-                  const claimed = myClaims.includes(item.name)
                   const maxed = myClaims.length >= maxPer
                   return (
-                    <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+                    <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 0', borderBottom: '1px solid var(--border)' }}>
                       <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 14, fontWeight: 600 }}>{item.name}</div>
-                        {item.desc && <div style={{ fontSize: 12, color: 'var(--text3)' }}>{item.desc}</div>}
+                        <div style={{ fontSize: 15, fontWeight: 600 }}>{item.name}</div>
+                        {item.desc && <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 2 }}>{item.desc}</div>}
                       </div>
                       <button
-                        onClick={() => !claimed && !maxed && claimLoot(char, item.name)}
-                        disabled={claimed || maxed}
+                        onClick={async () => {
+                          if (maxed) return
+                          // Optimistically remove from local session data
+                          setSessionDataMap(prev => {
+                            const sid = lootModal!.sessionId
+                            const existing = prev[sid]
+                            if (!existing) return prev
+                            return { ...prev, [sid]: { ...existing, loot_pool: (existing.loot_pool ?? []).filter(i => i.name !== item.name) } }
+                          })
+                          await claimLoot(char, item.name)
+                        }}
+                        disabled={maxed}
                         style={{
-                          padding: '6px 14px', border: 'none', borderRadius: 3,
-                          background: claimed ? 'var(--green)' : maxed ? 'var(--border)' : 'var(--teal)',
-                          color: claimed || maxed ? '#fff' : '#fff',
-                          fontSize: 13, fontWeight: 600, cursor: claimed || maxed ? 'not-allowed' : 'pointer',
-                          fontFamily: 'inherit', opacity: maxed && !claimed ? 0.5 : 1,
+                          padding: '8px 18px', border: 'none', borderRadius: 3,
+                          background: maxed ? 'var(--border)' : 'var(--teal)',
+                          color: '#fff',
+                          fontSize: 14, fontWeight: 700,
+                          cursor: maxed ? 'not-allowed' : 'pointer',
+                          fontFamily: 'inherit', opacity: maxed ? 0.5 : 1,
+                          flexShrink: 0,
                         }}
                       >
-                        {claimed ? 'Claimed' : maxed ? 'Maxed' : 'Claim'}
+                        {maxed ? 'Maxed' : 'Take'}
                       </button>
                     </div>
                   )
@@ -372,19 +383,21 @@ export default function PlayerMenuScreen() {
                   <div style={{ textAlign: 'center', color: 'var(--text3)', fontSize: 14, padding: 20 }}>No items in shop.</div>
                 )}
                 {items.map(item => (
-                  <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+                  <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 0', borderBottom: '1px solid var(--border)' }}>
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 14, fontWeight: 600 }}>{item.name}</div>
-                      {item.desc && <div style={{ fontSize: 12, color: 'var(--text3)' }}>{item.desc}</div>}
+                      <div style={{ fontSize: 15, fontWeight: 600 }}>{item.name}</div>
+                      {item.desc && <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 2 }}>{item.desc}</div>}
                     </div>
                     <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--gold)', flexShrink: 0 }}>{item.price} gp</span>
                     <button
                       onClick={async () => {
                         setShopError('')
-                        const result = await purchaseItem(char, item)
-                        if (result === 'insufficient_gold') setShopError(`Not enough gold to buy ${item.name}.`)
+                        // Use the freshest character data from store
+                        const freshChar = useCharacterStore.getState().characters.find(c => c.id === char.id) ?? char
+                        const result = await purchaseItem(freshChar, item)
+                        if (result === 'insufficient_gold') setShopError(`Not enough gold for ${item.name}.`)
                       }}
-                      style={{ padding: '6px 14px', background: 'var(--teal)', color: '#fff', border: 'none', fontSize: 13, fontWeight: 600, cursor: 'pointer', borderRadius: 3, fontFamily: 'inherit', flexShrink: 0 }}
+                      style={{ padding: '8px 18px', background: 'var(--teal)', color: '#fff', border: 'none', fontSize: 14, fontWeight: 700, cursor: 'pointer', borderRadius: 3, fontFamily: 'inherit', flexShrink: 0 }}
                     >
                       Buy
                     </button>

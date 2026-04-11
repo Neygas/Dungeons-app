@@ -210,15 +210,18 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         (payload) => set({ activeSession: payload.new as Session }))
       .subscribe()
 
-    // Own character updates pushed by DM (conditions, HP, etc.)
+    // Own character updates pushed by DM (conditions, HP, inspiration, etc.)
     const charCh = supabase
       .channel(`player-char:${characterId}`)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'characters', filter: `id=eq.${characterId}` },
         (payload) => {
           const updated = payload.new as Character
-          const cs = useCharacterStore.getState()
-          // Update both the characters list and activeCharacter
-          cs.setActiveCharacter(updated)
+          // Update both the characters list AND activeCharacter so CharacterSheetScreen
+          // re-renders immediately without the useEffect overwriting with stale data
+          useCharacterStore.setState(state => ({
+            activeCharacter: state.activeCharacter?.id === updated.id ? updated : state.activeCharacter,
+            characters: state.characters.map(c => c.id === updated.id ? updated : c),
+          }))
         })
       .subscribe()
 
@@ -293,7 +296,9 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     if (existing.length >= maxPer) return
 
     claims[character.id] = [...existing, itemName]
-    await get().patchSession({ loot_claims: claims })
+    // Remove the claimed item from the loot pool
+    const newPool = (activeSession.loot_pool ?? []).filter(i => i.name !== itemName)
+    await get().patchSession({ loot_claims: claims, loot_pool: newPool })
 
     const inv = character.inventory ?? []
     const found = inv.find(i => i.name === itemName)
@@ -301,6 +306,12 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       ? inv.map(i => i.name === itemName ? { ...i, quantity: i.quantity + 1 } : i)
       : [...inv, { name: itemName, quantity: 1 }]
     await supabase.from('characters').update({ inventory: newInv, updated_at: new Date().toISOString() }).eq('id', character.id)
+
+    // Update local characterStore so UI reflects the new inventory immediately
+    useCharacterStore.setState(state => ({
+      characters: state.characters.map(c => c.id === character.id ? { ...c, inventory: newInv } : c),
+      activeCharacter: state.activeCharacter?.id === character.id ? { ...state.activeCharacter, inventory: newInv } : state.activeCharacter,
+    }))
 
     await get().logEntry(activeSession.id, character.name, 'loot', `${character.name} claimed: ${itemName}`, {}, character.id)
   },
@@ -328,6 +339,13 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       : [...inv, { name: item.name, quantity: 1, desc: item.desc }]
 
     await supabase.from('characters').update({ ...updates, updated_at: new Date().toISOString() }).eq('id', character.id)
+
+    // Update local characterStore so gold + inventory reflect immediately
+    useCharacterStore.setState(state => ({
+      characters: state.characters.map(c => c.id === character.id ? { ...c, ...updates } : c),
+      activeCharacter: state.activeCharacter?.id === character.id ? { ...state.activeCharacter, ...updates } : state.activeCharacter,
+    }))
+
     await get().logEntry(activeSession.id, character.name, 'shop', `${character.name} purchased: ${item.name} (${item.price} gp)`, {}, character.id)
     return 'ok'
   },
