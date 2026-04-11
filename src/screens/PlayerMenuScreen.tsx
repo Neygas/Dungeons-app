@@ -85,6 +85,13 @@ export default function PlayerMenuScreen() {
   const [lootModal, setLootModal] = useState<{ sessionId: string; charId: string } | null>(null)
   const [shopModal, setShopModal] = useState<{ sessionId: string; charId: string } | null>(null)
   const [shopError, setShopError] = useState('')
+  const [shopDetailItem, setShopDetailItem] = useState<ShopItem | null>(null)
+  const [toast, setToast] = useState('')
+
+  const showToast = (msg: string) => {
+    setToast(msg)
+    setTimeout(() => setToast(''), 2500)
+  }
 
   useEffect(() => {
     if (user) fetchCharacters(user.id)
@@ -333,6 +340,7 @@ export default function PlayerMenuScreen() {
                             return { ...prev, [sid]: { ...existing, loot_pool: (existing.loot_pool ?? []).filter(i => i.name !== item.name) } }
                           })
                           await claimLoot(char, item.name)
+                          showToast(`${item.name} added to inventory!`)
                         }}
                         disabled={maxed}
                         style={{
@@ -356,6 +364,72 @@ export default function PlayerMenuScreen() {
         )
       })()}
 
+      {/* ── Shop Item Detail ─────────────────────────────────────────────────── */}
+      {shopDetailItem && shopModal && (() => {
+        const char = getShopChar()
+        if (!char) return null
+        const totalGp = (char.gp ?? 0) + (char.pp ?? 0) * 10 + (char.ep ?? 0) * 0.5 + (char.sp ?? 0) * 0.1 + (char.cp ?? 0) * 0.01
+        const canAfford = totalGp >= shopDetailItem.price
+        return (
+          <div
+            onClick={e => { if (e.target === e.currentTarget) setShopDetailItem(null) }}
+            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.6)', zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+          >
+            <div style={{ background: 'var(--white)', borderRadius: 12, width: '100%', maxWidth: 360, padding: 22 }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 8 }}>
+                <div style={{ fontSize: 20, fontWeight: 700 }}>{shopDetailItem.name}</div>
+                <button onClick={() => setShopDetailItem(null)} style={{ width: 28, height: 28, borderRadius: '50%', border: 'none', background: 'var(--bg)', cursor: 'pointer', fontSize: 15, color: 'var(--text2)', flexShrink: 0 }}>✕</button>
+              </div>
+              <div style={{ fontSize: 13, color: 'var(--text3)', marginBottom: 16, textTransform: 'uppercase', letterSpacing: '.5px' }}>{shopDetailItem.category}</div>
+              {shopDetailItem.desc && (
+                <div style={{ fontSize: 14, color: 'var(--text)', lineHeight: 1.6, marginBottom: 18, padding: '10px 12px', background: 'var(--bg)', borderRadius: 6 }}>
+                  {shopDetailItem.desc}
+                </div>
+              )}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                <div>
+                  <div style={{ fontSize: 22, fontWeight: 700, color: canAfford ? 'var(--gold)' : 'var(--red)' }}>{shopDetailItem.price} gp</div>
+                  <div style={{ fontSize: 12, color: canAfford ? 'var(--text3)' : 'var(--red)' }}>
+                    {char.name} has {char.gp} gp{!canAfford ? ' — not enough' : ''}
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={async () => {
+                  setShopError('')
+                  const freshChar = useCharacterStore.getState().characters.find(c => c.id === char.id) ?? char
+                  const result = await purchaseItem(freshChar, shopDetailItem)
+                  if (result === 'insufficient_gold') {
+                    setShopError(`Not enough gold for ${shopDetailItem.name}.`)
+                  } else {
+                    showToast(`Purchased ${shopDetailItem.name}!`)
+                    setShopDetailItem(null)
+                  }
+                }}
+                disabled={!canAfford}
+                style={{
+                  display: 'block', width: '100%', padding: 13,
+                  background: canAfford ? 'var(--teal)' : 'var(--border)',
+                  color: canAfford ? '#fff' : 'var(--text3)',
+                  border: 'none', fontSize: 15, fontWeight: 700,
+                  cursor: canAfford ? 'pointer' : 'not-allowed',
+                  borderRadius: 4, fontFamily: 'inherit',
+                }}
+              >
+                {canAfford ? `Buy for ${shopDetailItem.price} gp` : 'Not enough gold'}
+              </button>
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* ── Toast ────────────────────────────────────────────────────────────── */}
+      {toast && (
+        <div style={{ position: 'fixed', bottom: 32, left: '50%', transform: 'translateX(-50%)', background: 'var(--teal)', color: '#fff', padding: '10px 22px', borderRadius: 20, fontSize: 14, fontWeight: 600, zIndex: 500, boxShadow: '0 4px 16px rgba(0,0,0,.2)', whiteSpace: 'nowrap', pointerEvents: 'none' }}>
+          {toast}
+        </div>
+      )}
+
       {/* ── Shop Modal ─────────────────────────────────────────────────────────── */}
       {shopModal && (() => {
         const sess = getShopSession()
@@ -364,7 +438,7 @@ export default function PlayerMenuScreen() {
         const items: ShopItem[] = sess.shop_items ?? []
         const totalGp = (char.gp ?? 0) + (char.pp ?? 0) * 10 + (char.ep ?? 0) * 0.5 + (char.sp ?? 0) * 0.1 + (char.cp ?? 0) * 0.01
         return (
-          <div onClick={e => { if (e.target === e.currentTarget) { setShopModal(null); setShopError('') } }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.55)', zIndex: 300, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+          <div onClick={e => { if (e.target === e.currentTarget) { setShopModal(null); setShopError(''); setShopDetailItem(null) } }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.55)', zIndex: 300, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
             <div style={{ background: 'var(--white)', width: '100%', maxWidth: 600, borderRadius: '14px 14px 0 0', maxHeight: '85vh', overflowY: 'auto' }}>
               <div style={{ padding: '16px 16px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div>
@@ -383,24 +457,19 @@ export default function PlayerMenuScreen() {
                   <div style={{ textAlign: 'center', color: 'var(--text3)', fontSize: 14, padding: 20 }}>No items in shop.</div>
                 )}
                 {items.map(item => (
-                  <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 0', borderBottom: '1px solid var(--border)' }}>
+                  <div
+                    key={item.id}
+                    onClick={() => setShopDetailItem(item)}
+                    style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 0', borderBottom: '1px solid var(--border)', cursor: 'pointer' }}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--teal-light)')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                  >
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: 15, fontWeight: 600 }}>{item.name}</div>
                       {item.desc && <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 2 }}>{item.desc}</div>}
                     </div>
                     <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--gold)', flexShrink: 0 }}>{item.price} gp</span>
-                    <button
-                      onClick={async () => {
-                        setShopError('')
-                        // Use the freshest character data from store
-                        const freshChar = useCharacterStore.getState().characters.find(c => c.id === char.id) ?? char
-                        const result = await purchaseItem(freshChar, item)
-                        if (result === 'insufficient_gold') setShopError(`Not enough gold for ${item.name}.`)
-                      }}
-                      style={{ padding: '8px 18px', background: 'var(--teal)', color: '#fff', border: 'none', fontSize: 14, fontWeight: 700, cursor: 'pointer', borderRadius: 3, fontFamily: 'inherit', flexShrink: 0 }}
-                    >
-                      Buy
-                    </button>
+                    <span style={{ fontSize: 12, color: 'var(--text3)', flexShrink: 0 }}>›</span>
                   </div>
                 ))}
               </div>
