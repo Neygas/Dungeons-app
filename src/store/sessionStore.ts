@@ -56,6 +56,7 @@ interface SessionState {
   // Loot
   setLootPool: (items: LootItem[], maxPerPlayer: number) => Promise<void>
   claimLoot: (character: Character, itemName: string) => Promise<void>
+  confirmLootClaims: (character: Character, items: LootItem[]) => Promise<void>
 
   // Shop
   purchaseItem: (character: Character, item: ShopItem) => Promise<'ok' | 'insufficient_gold'>
@@ -318,6 +319,40 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     }))
 
     await get().logEntry(activeSession.id, character.name, 'loot', `${character.name} claimed: ${itemName}`, {}, character.id)
+  },
+
+  // Confirm all selected loot items at once, then clear this player's claims
+  confirmLootClaims: async (character, items) => {
+    const { activeSession } = get()
+    if (!activeSession || items.length === 0) return
+
+    // Add items to inventory
+    const inv = character.inventory ?? []
+    let newInv = [...inv]
+    for (const item of items) {
+      const found = newInv.find(i => i.name === item.name)
+      newInv = found
+        ? newInv.map(i => i.name === item.name ? { ...i, quantity: i.quantity + 1 } : i)
+        : [...newInv, { name: item.name, quantity: 1, desc: item.desc }]
+    }
+    await supabase.from('characters').update({ inventory: newInv, updated_at: new Date().toISOString() }).eq('id', character.id)
+
+    useCharacterStore.setState(state => ({
+      characters: state.characters.map(c => c.id === character.id ? { ...c, inventory: newInv } : c),
+      activeCharacter: state.activeCharacter?.id === character.id ? { ...state.activeCharacter, inventory: newInv } : state.activeCharacter,
+    }))
+
+    // Remove claimed items from pool and clear this player's claim record
+    const itemNames = items.map(i => i.name)
+    const newPool = (activeSession.loot_pool ?? []).filter(i => !itemNames.includes(i.name))
+    const newClaims = { ...(activeSession.loot_claims ?? {}) }
+    delete newClaims[character.id]
+    await get().patchSession({ loot_pool: newPool, loot_claims: newClaims })
+
+    await get().logEntry(
+      activeSession.id, character.name, 'loot',
+      `${character.name} claimed: ${itemNames.join(', ')}`, {}, character.id
+    )
   },
 
   // ── Shop ────────────────────────────────────────────────────────────────────

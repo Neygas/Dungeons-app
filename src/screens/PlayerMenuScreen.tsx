@@ -86,7 +86,7 @@ export default function PlayerMenuScreen() {
   const navigate = useNavigate()
   const { user, signOut } = useAuthStore()
   const { characters, loading, fetchCharacters } = useCharacterStore()
-  const { joinSession, leaveSession, getJoinedSession, claimLoot, purchaseItem } = useSessionStore()
+  const { joinSession, leaveSession, getJoinedSession, confirmLootClaims, purchaseItem } = useSessionStore()
 
   const [sessionCode, setSessionCode] = useState('')
   const [selectedCharId, setSelectedCharId] = useState('')
@@ -98,6 +98,7 @@ export default function PlayerMenuScreen() {
 
   // Loot/shop modals
   const [lootModal, setLootModal] = useState<{ sessionId: string; charId: string } | null>(null)
+  const [lootSelections, setLootSelections] = useState<string[]>([])
   const [shopModal, setShopModal] = useState<{ sessionId: string; charId: string } | null>(null)
   const [shopError, setShopError] = useState('')
   const [shopDetailItem, setShopDetailItem] = useState<ShopItem | null>(null)
@@ -318,64 +319,104 @@ export default function PlayerMenuScreen() {
         const char = getLootChar()
         if (!sess || !char) return null
         const items: LootItem[] = sess.loot_pool ?? []
-        const myClaims: string[] = (sess.loot_claims ?? {})[char.id] ?? []
         const maxPer = sess.loot_max_per_player ?? 1
+        const selected = lootSelections
+        const atMax = selected.length >= maxPer
+
+        const toggle = (name: string) => {
+          if (selected.includes(name)) {
+            setLootSelections(selected.filter(n => n !== name))
+          } else {
+            if (atMax) return
+            setLootSelections([...selected, name])
+          }
+        }
+
+        const handleClaim = async () => {
+          if (selected.length === 0) return
+          const itemsToClaim = items.filter(i => selected.includes(i.name))
+          // Optimistically update local session pool
+          setSessionDataMap(prev => {
+            const sid = lootModal!.sessionId
+            const existing = prev[sid]
+            if (!existing) return prev
+            return { ...prev, [sid]: { ...existing, loot_pool: (existing.loot_pool ?? []).filter(i => !selected.includes(i.name)) } }
+          })
+          setLootSelections([])
+          setLootModal(null)
+          await confirmLootClaims(char, itemsToClaim)
+          showToast(`${selected.length} item${selected.length > 1 ? 's' : ''} added to inventory!`)
+        }
+
         return (
-          <div onClick={e => { if (e.target === e.currentTarget) setLootModal(null) }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.55)', zIndex: 300, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
-            <div style={{ background: 'var(--white)', width: '100%', maxWidth: 600, borderRadius: '14px 14px 0 0', maxHeight: '85vh', overflowY: 'auto' }}>
-              <div style={{ padding: '16px 16px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div onClick={e => { if (e.target === e.currentTarget) { setLootModal(null); setLootSelections([]) } }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.55)', zIndex: 300, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+            <div style={{ background: 'var(--white)', width: '100%', maxWidth: 600, borderRadius: '14px 14px 0 0', maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
+              {/* Header */}
+              <div style={{ padding: '16px 16px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
                 <div>
-                  <div style={{ fontSize: 17, fontWeight: 700 }}>Loot Pool</div>
-                  <div style={{ fontSize: 12, color: 'var(--text3)' }}>
-                    Claimed: {myClaims.length}/{maxPer} — playing as {char.name}
+                  <div style={{ fontSize: 17, fontWeight: 700 }}>{sess.loot_title || 'Loot Pool'}</div>
+                  <div style={{ fontSize: 12, color: atMax ? 'var(--teal2)' : 'var(--text3)' }}>
+                    {selected.length}/{maxPer} selected — {char.name}
                   </div>
                 </div>
-                <button onClick={() => setLootModal(null)} style={{ width: 30, height: 30, borderRadius: '50%', border: 'none', background: 'var(--bg)', cursor: 'pointer', fontSize: 16, color: 'var(--text2)' }}>✕</button>
+                <button onClick={() => { setLootModal(null); setLootSelections([]) }} style={{ width: 30, height: 30, borderRadius: '50%', border: 'none', background: 'var(--bg)', cursor: 'pointer', fontSize: 16, color: 'var(--text2)' }}>✕</button>
               </div>
-              <div style={{ padding: 16 }}>
+
+              {/* Item list */}
+              <div style={{ overflowY: 'auto', flex: 1, padding: '0 16px' }}>
                 {items.length === 0 && (
                   <div style={{ textAlign: 'center', color: 'var(--text3)', fontSize: 14, padding: 20 }}>No items available.</div>
                 )}
                 {items.map(item => {
-                  const maxed = myClaims.length >= maxPer
+                  const isSelected = selected.includes(item.name)
+                  const disabled = !isSelected && atMax
                   return (
-                    <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 0', borderBottom: '1px solid var(--border)' }}>
-                      <div style={{ flex: 1 }}>
+                    <div
+                      key={item.id}
+                      onClick={() => toggle(item.name)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0',
+                        borderBottom: '1px solid var(--border)', cursor: disabled ? 'not-allowed' : 'pointer',
+                        opacity: disabled ? 0.4 : 1,
+                      }}
+                    >
+                      {/* Checkbox */}
+                      <div style={{
+                        width: 22, height: 22, borderRadius: 4, flexShrink: 0,
+                        border: `2px solid ${isSelected ? 'var(--teal)' : 'var(--border2)'}`,
+                        background: isSelected ? 'var(--teal)' : 'var(--white)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}>
+                        {isSelected && <span style={{ color: '#fff', fontSize: 13, fontWeight: 700 }}>✓</span>}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 2 }}>
                           <span style={{ fontSize: 15, fontWeight: 600 }}>{item.name}</span>
                           <RarityBadge rarity={item.rarity} />
                         </div>
                         {item.desc && <div style={{ fontSize: 12, color: 'var(--text3)' }}>{item.desc}</div>}
                       </div>
-                      <button
-                        onClick={async () => {
-                          if (maxed) return
-                          // Optimistically remove from local session data
-                          setSessionDataMap(prev => {
-                            const sid = lootModal!.sessionId
-                            const existing = prev[sid]
-                            if (!existing) return prev
-                            return { ...prev, [sid]: { ...existing, loot_pool: (existing.loot_pool ?? []).filter(i => i.name !== item.name) } }
-                          })
-                          await claimLoot(char, item.name)
-                          showToast(`${item.name} added to inventory!`)
-                        }}
-                        disabled={maxed}
-                        style={{
-                          padding: '8px 18px', border: 'none', borderRadius: 3,
-                          background: maxed ? 'var(--border)' : 'var(--teal)',
-                          color: '#fff',
-                          fontSize: 14, fontWeight: 700,
-                          cursor: maxed ? 'not-allowed' : 'pointer',
-                          fontFamily: 'inherit', opacity: maxed ? 0.5 : 1,
-                          flexShrink: 0,
-                        }}
-                      >
-                        {maxed ? 'Maxed' : 'Take'}
-                      </button>
                     </div>
                   )
                 })}
+              </div>
+
+              {/* Claim button */}
+              <div style={{ padding: 16, flexShrink: 0, borderTop: '1px solid var(--border)' }}>
+                <button
+                  onClick={handleClaim}
+                  disabled={selected.length === 0}
+                  style={{
+                    display: 'block', width: '100%', padding: 14,
+                    background: selected.length > 0 ? 'var(--teal)' : 'var(--border)',
+                    color: selected.length > 0 ? '#fff' : 'var(--text3)',
+                    border: 'none', fontSize: 15, fontWeight: 700,
+                    cursor: selected.length > 0 ? 'pointer' : 'not-allowed',
+                    borderRadius: 4, fontFamily: 'inherit', transition: 'all .15s',
+                  }}
+                >
+                  {selected.length === 0 ? 'Select items to claim' : `Claim ${selected.length} item${selected.length > 1 ? 's' : ''} → Add to Inventory`}
+                </button>
               </div>
             </div>
           </div>
