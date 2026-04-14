@@ -4,7 +4,22 @@ import { useAuthStore } from '@/store/authStore'
 import { useCharacterStore } from '@/store/characterStore'
 import { useSessionStore } from '@/store/sessionStore'
 import { supabase } from '@/lib/supabase'
-import type { Character, Session, LootItem, ShopItem } from '@/types'
+import type { Character, Session, LootItem, ShopItem, LootRarity } from '@/types'
+import { RARITY_COLORS, RARITY_LABELS } from '@/data/lootTemplates'
+
+function RarityBadge({ rarity }: { rarity?: LootRarity }) {
+  if (!rarity) return null
+  return (
+    <span style={{
+      fontSize: 9, fontWeight: 700, color: '#fff',
+      background: RARITY_COLORS[rarity],
+      padding: '2px 5px', borderRadius: 2,
+      letterSpacing: .3, textTransform: 'uppercase',
+    }}>
+      {RARITY_LABELS[rarity]}
+    </span>
+  )
+}
 
 function classIcon(cls: string) {
   const icons: Record<string, string> = {
@@ -326,8 +341,11 @@ export default function PlayerMenuScreen() {
                   return (
                     <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 0', borderBottom: '1px solid var(--border)' }}>
                       <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 15, fontWeight: 600 }}>{item.name}</div>
-                        {item.desc && <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 2 }}>{item.desc}</div>}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 2 }}>
+                          <span style={{ fontSize: 15, fontWeight: 600 }}>{item.name}</span>
+                          <RarityBadge rarity={item.rarity} />
+                        </div>
+                        {item.desc && <div style={{ fontSize: 12, color: 'var(--text3)' }}>{item.desc}</div>}
                       </div>
                       <button
                         onClick={async () => {

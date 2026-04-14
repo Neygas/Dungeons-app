@@ -246,8 +246,12 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   patchSession: async (updates) => {
     const { activeSession } = get()
     if (!activeSession) return
-    await supabase.from('sessions').update(updates).eq('id', activeSession.id)
-    set(s => ({ activeSession: s.activeSession ? { ...s.activeSession, ...updates } : null }))
+    // Closing the loot pool resets claims so players can claim from the next pool
+    const finalUpdates = updates.loot_open === false
+      ? { ...updates, loot_claims: {} }
+      : updates
+    await supabase.from('sessions').update(finalUpdates).eq('id', activeSession.id)
+    set(s => ({ activeSession: s.activeSession ? { ...s.activeSession, ...finalUpdates } : null }))
   },
 
   setInitiative: async (order) => get().patchSession({ initiative: order, current_turn: 0 }),

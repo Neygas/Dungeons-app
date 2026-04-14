@@ -193,12 +193,15 @@ export interface ShopItem {
   desc?: string
 }
 
+export type LootRarity = 'common' | 'uncommon' | 'rare' | 'very_rare' | 'legendary'
+
 export interface LootItem {
   id: string
   name: string
   desc?: string
   quantity: number
   category?: string
+  rarity?: LootRarity
 }
 
 export interface Session {
@@ -216,6 +219,7 @@ export interface Session {
   loot_open: boolean
   loot_max_per_player: number
   loot_claims: Record<string, string[]>
+  loot_title?: string
   dm_notes: string
   active: boolean
   created_at: string

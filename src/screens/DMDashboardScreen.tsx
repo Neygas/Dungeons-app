@@ -2,9 +2,32 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useSessionStore } from '@/store/sessionStore'
 import { CONDITIONS } from '@/data/conditions'
-import { GEAR_DB } from '@/data/gear'
+import { GEAR_DB, GEAR_CATEGORIES } from '@/data/gear'
+import { PREMADE_LOOT_POOLS, RARITY_COLORS, RARITY_LABELS, type LootTemplate } from '@/data/lootTemplates'
 import { hpColor, calcArmorAC, passivePerception, mod } from '@/lib/calculations'
-import type { Character, InitiativeEntry, LootItem, ShopItem } from '@/types'
+import type { Character, InitiativeEntry, LootItem, ShopItem, LootRarity } from '@/types'
+
+const TEMPLATES_KEY = 'dnd_loot_templates'
+function loadTemplates(): LootTemplate[] {
+  try { return JSON.parse(localStorage.getItem(TEMPLATES_KEY) ?? '[]') } catch { return [] }
+}
+function saveTemplatesLocal(templates: LootTemplate[]) {
+  localStorage.setItem(TEMPLATES_KEY, JSON.stringify(templates))
+}
+
+function RarityBadge({ rarity }: { rarity?: LootRarity }) {
+  if (!rarity) return null
+  return (
+    <span style={{
+      fontSize: 9, fontWeight: 700, color: '#fff',
+      background: RARITY_COLORS[rarity],
+      padding: '2px 5px', borderRadius: 2,
+      letterSpacing: .3, textTransform: 'uppercase', flexShrink: 0,
+    }}>
+      {RARITY_LABELS[rarity]}
+    </span>
+  )
+}
 
 type Tab = 'players' | 'initiative' | 'log' | 'loot' | 'shop' | 'notes'
 
@@ -270,16 +293,24 @@ export default function DMDashboardScreen() {
   const [enemyInit, setEnemyInit] = useState('')
 
   // Loot
-  const [lootSearch, setLootSearch] = useState('')
   const [customLootName, setCustomLootName] = useState('')
   const [customLootDesc, setCustomLootDesc] = useState('')
   const [maxPerPlayer, setMaxPerPlayer] = useState('1')
+  const [lootTitle, setLootTitle] = useState('')
+  const [lootPickerOpen, setLootPickerOpen] = useState(false)
+  const [lootPickerSearch, setLootPickerSearch] = useState('')
+  const [lootPickerCat, setLootPickerCat] = useState('All')
+  const [savedTemplates, setSavedTemplates] = useState<LootTemplate[]>(loadTemplates)
+  const [showSaveTemplate, setShowSaveTemplate] = useState(false)
+  const [saveTemplateName, setSaveTemplateName] = useState('')
 
   // Shop
-  const [shopSearch, setShopSearch] = useState('')
   const [customShopName, setCustomShopName] = useState('')
   const [customShopPrice, setCustomShopPrice] = useState('')
   const [customShopDesc, setCustomShopDesc] = useState('')
+  const [shopPickerOpen, setShopPickerOpen] = useState(false)
+  const [shopPickerSearch, setShopPickerSearch] = useState('')
+  const [shopPickerCat, setShopPickerCat] = useState('All')
 
   useEffect(() => {
     if (sessionId) {
@@ -289,12 +320,15 @@ export default function DMDashboardScreen() {
     return () => { unsubscribeAll() }
   }, [sessionId]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Sync maxPerPlayer input when session loads
+  // Sync maxPerPlayer + lootTitle when session loads
   useEffect(() => {
     if (activeSession?.loot_max_per_player) {
       setMaxPerPlayer(String(activeSession.loot_max_per_player))
     }
-  }, [activeSession?.loot_max_per_player])
+    if (activeSession?.loot_title !== undefined) {
+      setLootTitle(activeSession.loot_title ?? '')
+    }
+  }, [activeSession?.loot_max_per_player, activeSession?.loot_title])
 
   if (loading && !activeSession) {
     return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', color: 'var(--text3)' }}>Loading session...</div>
@@ -357,10 +391,10 @@ export default function DMDashboardScreen() {
 
   // ── Loot handlers ────────────────────────────────────────────────────────────
 
-  const addLootFromDB = (item: { name: string; desc: string }) => {
+  const addLootFromDB = (item: { name: string; desc: string }, rarity?: LootRarity) => {
     const existing = s.loot_pool ?? []
     if (existing.some(e => e.name === item.name)) return
-    const newItem: LootItem = { id: `loot-${Date.now()}`, name: item.name, desc: item.desc, quantity: 1 }
+    const newItem: LootItem = { id: `loot-${Date.now()}`, name: item.name, desc: item.desc, quantity: 1, rarity }
     patchSession({ loot_pool: [...existing, newItem] })
   }
 
@@ -374,6 +408,39 @@ export default function DMDashboardScreen() {
 
   const removeLootItem = (itemId: string) => {
     patchSession({ loot_pool: (s.loot_pool ?? []).filter(i => i.id !== itemId) })
+  }
+
+  const loadPremadePool = (template: LootTemplate) => {
+    const withUniqueIds = template.items.map(item => ({ ...item, id: `loot-${Date.now()}-${Math.random()}` }))
+    patchSession({ loot_pool: withUniqueIds, loot_title: template.name })
+    setLootTitle(template.name)
+  }
+
+  const loadSavedTemplate = (template: LootTemplate) => {
+    const withUniqueIds = template.items.map(item => ({ ...item, id: `loot-${Date.now()}-${Math.random()}` }))
+    patchSession({ loot_pool: withUniqueIds, loot_title: template.name })
+    setLootTitle(template.name)
+  }
+
+  const saveCurrentAsTemplate = () => {
+    if (!saveTemplateName.trim()) return
+    const template: LootTemplate = {
+      id: `tmpl-${Date.now()}`,
+      name: saveTemplateName.trim(),
+      rarity: 'common',
+      items: s.loot_pool ?? [],
+    }
+    const next = [...savedTemplates, template]
+    setSavedTemplates(next)
+    saveTemplatesLocal(next)
+    setSaveTemplateName('')
+    setShowSaveTemplate(false)
+  }
+
+  const deleteSavedTemplate = (id: string) => {
+    const next = savedTemplates.filter(t => t.id !== id)
+    setSavedTemplates(next)
+    saveTemplatesLocal(next)
   }
 
   // ── Shop handlers ────────────────────────────────────────────────────────────
@@ -621,6 +688,7 @@ export default function DMDashboardScreen() {
       {/* ── Loot Tab ─────────────────────────────────────────────────────────────── */}
       {tab === 'loot' && (
         <div>
+          {/* Header + toggle */}
           <div style={{ background: 'var(--white)', border: '1px solid var(--border)', padding: '8px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.5px' }}>Loot Pool</span>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -634,9 +702,20 @@ export default function DMDashboardScreen() {
             </div>
           </div>
 
+          {/* Title */}
+          <div style={{ background: 'var(--white)', border: '1px solid var(--border)', borderTop: 'none', padding: '8px 14px' }}>
+            <input
+              value={lootTitle}
+              onChange={e => setLootTitle(e.target.value)}
+              onBlur={() => patchSession({ loot_title: lootTitle })}
+              placeholder="Pool title (e.g. Goblin Cave Treasure)"
+              style={{ display: 'block', width: '100%', border: 'none', borderBottom: '1px solid var(--border2)', background: 'transparent', fontSize: 14, fontFamily: 'inherit', outline: 'none', padding: '4px 2px', color: 'var(--text)' }}
+            />
+          </div>
+
           {/* Max per player */}
-          <div style={{ background: 'var(--white)', border: '1px solid var(--border)', borderTop: 'none', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 13, color: 'var(--text2)' }}>Max items per player:</span>
+          <div style={{ background: 'var(--white)', border: '1px solid var(--border)', borderTop: 'none', padding: '8px 14px', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 13, color: 'var(--text2)', flex: 1 }}>Max items per player:</span>
             <input
               type="number"
               value={maxPerPlayer}
@@ -646,29 +725,90 @@ export default function DMDashboardScreen() {
             />
           </div>
 
-          {/* Loot items */}
+          {/* Pre-made pools */}
+          <div style={{ background: 'var(--white)', border: '1px solid var(--border)', borderTop: 'none', padding: '10px 14px' }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 8 }}>Pre-made Pools</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {PREMADE_LOOT_POOLS.map(tmpl => (
+                <button
+                  key={tmpl.id}
+                  onClick={() => loadPremadePool(tmpl)}
+                  style={{ padding: '5px 10px', border: `1px solid ${RARITY_COLORS[tmpl.rarity]}`, background: '#fff', color: RARITY_COLORS[tmpl.rarity], fontSize: 12, fontWeight: 700, cursor: 'pointer', borderRadius: 3, fontFamily: 'inherit' }}
+                >
+                  {RARITY_LABELS[tmpl.rarity]}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Saved templates */}
+          {savedTemplates.length > 0 && (
+            <div style={{ background: 'var(--white)', border: '1px solid var(--border)', borderTop: 'none', padding: '10px 14px' }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 8 }}>Saved Templates</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {savedTemplates.map(tmpl => (
+                  <div key={tmpl.id} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 8px', border: '1px solid var(--border2)', borderRadius: 3, background: 'var(--bg)' }}>
+                    <span
+                      onClick={() => loadSavedTemplate(tmpl)}
+                      style={{ fontSize: 12, cursor: 'pointer', color: 'var(--teal2)', fontWeight: 600 }}
+                    >{tmpl.name}</span>
+                    <button onClick={() => deleteSavedTemplate(tmpl.id)} style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', fontSize: 12, padding: 0, lineHeight: 1, fontFamily: 'inherit' }}>✕</button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Current loot pool items */}
           {(s.loot_pool ?? []).length === 0 && (
             <div style={{ background: 'var(--white)', border: '1px solid var(--border)', borderTop: 'none', padding: '16px 14px', textAlign: 'center', color: 'var(--text3)', fontSize: 13 }}>
-              No loot yet. Add items below.
+              No loot yet. Load a pool or add items below.
             </div>
           )}
           {(s.loot_pool ?? []).map(item => {
             const claims = Object.values(s.loot_claims ?? {}).filter(arr => arr.includes(item.name)).length
             return (
               <div key={item.id} style={{ background: 'var(--white)', border: '1px solid var(--border)', borderTop: 'none', padding: '9px 14px', display: 'flex', alignItems: 'center', gap: 8 }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600 }}>{item.name}</div>
-                  {item.desc && <div style={{ fontSize: 11, color: 'var(--text3)' }}>{item.desc}</div>}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 13, fontWeight: 600 }}>{item.name}</span>
+                    <RarityBadge rarity={item.rarity} />
+                  </div>
+                  {item.desc && <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 1 }}>{item.desc}</div>}
                 </div>
                 {claims > 0 && (
-                  <span style={{ fontSize: 11, color: 'var(--green)', fontWeight: 600 }}>{claims} claimed</span>
+                  <span style={{ fontSize: 11, color: 'var(--green)', fontWeight: 600, flexShrink: 0 }}>{claims} claimed</span>
                 )}
                 <button onClick={() => removeLootItem(item.id)} style={{ background: 'none', border: 'none', color: 'var(--red)', cursor: 'pointer', fontSize: 14, padding: '0 2px', fontFamily: 'inherit' }}>✕</button>
               </div>
             )
           })}
 
-          {/* Custom loot */}
+          {/* Save current as template */}
+          {(s.loot_pool ?? []).length > 0 && (
+            <div style={{ background: 'var(--white)', border: '1px solid var(--border)', borderTop: 'none', padding: '8px 14px' }}>
+              {!showSaveTemplate ? (
+                <button onClick={() => setShowSaveTemplate(true)} style={{ fontSize: 12, color: 'var(--teal2)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}>
+                  Save current pool as template →
+                </button>
+              ) : (
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <input
+                    autoFocus
+                    value={saveTemplateName}
+                    onChange={e => setSaveTemplateName(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && saveCurrentAsTemplate()}
+                    placeholder="Template name"
+                    style={{ flex: 1, border: 'none', borderBottom: '1px solid var(--border2)', background: 'transparent', fontSize: 13, fontFamily: 'inherit', outline: 'none', padding: '4px 2px' }}
+                  />
+                  <button onClick={saveCurrentAsTemplate} disabled={!saveTemplateName.trim()} style={{ padding: '4px 12px', background: 'var(--teal)', color: '#fff', border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer', borderRadius: 2, fontFamily: 'inherit', opacity: saveTemplateName.trim() ? 1 : 0.5 }}>Save</button>
+                  <button onClick={() => { setShowSaveTemplate(false); setSaveTemplateName('') }} style={{ padding: '4px 8px', background: 'none', border: '1px solid var(--border2)', fontSize: 12, cursor: 'pointer', borderRadius: 2, fontFamily: 'inherit', color: 'var(--text2)' }}>✕</button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Custom item form */}
           <div style={{ background: 'var(--white)', border: '1px solid var(--border)', borderTop: 'none', padding: '12px 14px' }}>
             <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 8 }}>Add Custom Item</div>
             <input value={customLootName} onChange={e => setCustomLootName(e.target.value)} placeholder="Item name" style={{ display: 'block', width: '100%', border: 'none', borderBottom: '1px solid var(--border2)', background: 'transparent', fontSize: 14, fontFamily: 'inherit', outline: 'none', padding: '5px 2px', marginBottom: 6 }} />
@@ -676,20 +816,56 @@ export default function DMDashboardScreen() {
             <button onClick={addCustomLoot} style={{ padding: '7px 16px', background: 'var(--teal)', color: '#fff', border: 'none', fontSize: 13, fontWeight: 600, cursor: 'pointer', borderRadius: 2, fontFamily: 'inherit' }}>+ Add</button>
           </div>
 
-          {/* Loot from DB */}
-          <div style={{ background: 'var(--white)', border: '1px solid var(--border)', borderTop: 'none', padding: '12px 14px' }}>
-            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 8 }}>Add from Item Database</div>
-            <input value={lootSearch} onChange={e => setLootSearch(e.target.value)} placeholder="Search gear, potions, magic items..." style={{ display: 'block', width: '100%', border: 'none', borderBottom: '1px solid var(--border2)', background: 'transparent', fontSize: 14, fontFamily: 'inherit', outline: 'none', padding: '5px 2px', marginBottom: 6 }} />
-            {lootSearch.trim().length > 0 && GEAR_DB
-              .filter(g => g.name.toLowerCase().includes(lootSearch.toLowerCase()))
-              .slice(0, 8)
-              .map(g => (
-                <div key={g.name} onClick={() => addLootFromDB(g)} style={{ padding: '7px 4px', fontSize: 13, cursor: 'pointer', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: 'var(--teal)' }}>
-                  <span>{g.name}</span>
-                  <span style={{ fontSize: 11, color: 'var(--text3)' }}>{g.category}</span>
-                </div>
-              ))
-            }
+          {/* Add from DB button */}
+          <div style={{ background: 'var(--white)', border: '1px solid var(--border)', borderTop: 'none', padding: '10px 14px' }}>
+            <button
+              onClick={() => { setLootPickerOpen(true); setLootPickerSearch(''); setLootPickerCat('All') }}
+              style={{ display: 'block', width: '100%', padding: '9px', background: 'var(--bg)', border: '1px solid var(--border2)', fontSize: 13, fontWeight: 600, cursor: 'pointer', borderRadius: 2, fontFamily: 'inherit', color: 'var(--teal2)', textAlign: 'center' }}
+            >
+              + Add from Item Database
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Loot DB Picker Modal ──────────────────────────────────────────────────── */}
+      {lootPickerOpen && (
+        <div onClick={e => { if (e.target === e.currentTarget) setLootPickerOpen(false) }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 300, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+          <div style={{ background: 'var(--white)', width: '100%', maxWidth: 600, borderRadius: '14px 14px 0 0', maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ padding: '14px 16px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+              <span style={{ fontSize: 15, fontWeight: 700 }}>Add from Database</span>
+              <button onClick={() => setLootPickerOpen(false)} style={{ width: 30, height: 30, borderRadius: '50%', border: 'none', background: 'var(--bg)', cursor: 'pointer', fontSize: 16, color: 'var(--text2)' }}>✕</button>
+            </div>
+            <div style={{ padding: '10px 14px', flexShrink: 0 }}>
+              <input autoFocus value={lootPickerSearch} onChange={e => setLootPickerSearch(e.target.value)} placeholder="Search items..." style={{ width: '100%', border: '1px solid var(--border2)', padding: '8px 10px', fontSize: 14, fontFamily: 'inherit', borderRadius: 4, outline: 'none', color: 'var(--text)', background: 'var(--white)', boxSizing: 'border-box' }} />
+            </div>
+            <div style={{ display: 'flex', gap: 6, padding: '0 14px 10px', flexWrap: 'wrap', flexShrink: 0 }}>
+              {['All', ...GEAR_CATEGORIES].map(cat => (
+                <button key={cat} onClick={() => setLootPickerCat(cat)} style={{ padding: '4px 8px', border: '1px solid var(--border2)', background: lootPickerCat === cat ? 'var(--teal)' : 'var(--white)', color: lootPickerCat === cat ? '#fff' : 'var(--text2)', fontSize: 11, cursor: 'pointer', borderRadius: 3, fontFamily: 'inherit' }}>{cat}</button>
+              ))}
+            </div>
+            <div style={{ overflowY: 'auto', flex: 1 }}>
+              {GEAR_DB
+                .filter(g => (lootPickerCat === 'All' || g.category === lootPickerCat) && (!lootPickerSearch.trim() || g.name.toLowerCase().includes(lootPickerSearch.toLowerCase())))
+                .map(g => {
+                  const already = (s.loot_pool ?? []).some(i => i.name === g.name)
+                  return (
+                    <div
+                      key={g.name}
+                      onClick={() => !already && addLootFromDB(g)}
+                      style={{ display: 'flex', alignItems: 'center', padding: '11px 14px', borderBottom: '1px solid var(--border)', cursor: already ? 'default' : 'pointer', opacity: already ? 0.45 : 1 }}
+                      onMouseEnter={e => { if (!already) (e.currentTarget as HTMLElement).style.background = 'var(--teal-light)' }}
+                      onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = ''}
+                    >
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 14, fontWeight: 500 }}>{g.name}</div>
+                        <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 1 }}>{g.cost} · {g.category}</div>
+                      </div>
+                      <span style={{ fontSize: 12, color: already ? 'var(--text3)' : 'var(--teal2)', fontWeight: 600, marginLeft: 8 }}>{already ? 'Added' : '+ Add'}</span>
+                    </div>
+                  )
+                })}
+            </div>
           </div>
         </div>
       )}
@@ -715,7 +891,7 @@ export default function DMDashboardScreen() {
           )}
           {(s.shop_items ?? []).map(item => (
             <div key={item.id} style={{ background: 'var(--white)', border: '1px solid var(--border)', borderTop: 'none', padding: '9px 14px', display: 'flex', alignItems: 'center', gap: 8 }}>
-              <div style={{ flex: 1 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 13, fontWeight: 600 }}>{item.name}</div>
                 {item.desc && <div style={{ fontSize: 11, color: 'var(--text3)' }}>{item.desc}</div>}
               </div>
@@ -735,20 +911,58 @@ export default function DMDashboardScreen() {
             <button onClick={addCustomShop} style={{ padding: '7px 16px', background: 'var(--teal)', color: '#fff', border: 'none', fontSize: 13, fontWeight: 600, cursor: 'pointer', borderRadius: 2, fontFamily: 'inherit' }}>+ Add</button>
           </div>
 
-          {/* Shop from DB */}
-          <div style={{ background: 'var(--white)', border: '1px solid var(--border)', borderTop: 'none', padding: '12px 14px' }}>
-            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 8 }}>Add from Item Database</div>
-            <input value={shopSearch} onChange={e => setShopSearch(e.target.value)} placeholder="Search gear, potions, magic items..." style={{ display: 'block', width: '100%', border: 'none', borderBottom: '1px solid var(--border2)', background: 'transparent', fontSize: 14, fontFamily: 'inherit', outline: 'none', padding: '5px 2px', marginBottom: 6 }} />
-            {shopSearch.trim().length > 0 && GEAR_DB
-              .filter(g => g.name.toLowerCase().includes(shopSearch.toLowerCase()))
-              .slice(0, 8)
-              .map(g => (
-                <div key={g.name} onClick={() => addShopFromDB(g)} style={{ padding: '7px 4px', fontSize: 13, cursor: 'pointer', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ color: 'var(--teal)' }}>{g.name}</span>
-                  <span style={{ fontSize: 11, color: 'var(--text3)' }}>{g.cost}</span>
-                </div>
-              ))
-            }
+          {/* Add from DB button */}
+          <div style={{ background: 'var(--white)', border: '1px solid var(--border)', borderTop: 'none', padding: '10px 14px' }}>
+            <button
+              onClick={() => { setShopPickerOpen(true); setShopPickerSearch(''); setShopPickerCat('All') }}
+              style={{ display: 'block', width: '100%', padding: '9px', background: 'var(--bg)', border: '1px solid var(--border2)', fontSize: 13, fontWeight: 600, cursor: 'pointer', borderRadius: 2, fontFamily: 'inherit', color: 'var(--teal2)', textAlign: 'center' }}
+            >
+              + Add from Item Database
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Shop DB Picker Modal ──────────────────────────────────────────────────── */}
+      {shopPickerOpen && (
+        <div onClick={e => { if (e.target === e.currentTarget) setShopPickerOpen(false) }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 300, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+          <div style={{ background: 'var(--white)', width: '100%', maxWidth: 600, borderRadius: '14px 14px 0 0', maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ padding: '14px 16px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+              <span style={{ fontSize: 15, fontWeight: 700 }}>Add from Database</span>
+              <button onClick={() => setShopPickerOpen(false)} style={{ width: 30, height: 30, borderRadius: '50%', border: 'none', background: 'var(--bg)', cursor: 'pointer', fontSize: 16, color: 'var(--text2)' }}>✕</button>
+            </div>
+            <div style={{ padding: '10px 14px', flexShrink: 0 }}>
+              <input autoFocus value={shopPickerSearch} onChange={e => setShopPickerSearch(e.target.value)} placeholder="Search items..." style={{ width: '100%', border: '1px solid var(--border2)', padding: '8px 10px', fontSize: 14, fontFamily: 'inherit', borderRadius: 4, outline: 'none', color: 'var(--text)', background: 'var(--white)', boxSizing: 'border-box' }} />
+            </div>
+            <div style={{ display: 'flex', gap: 6, padding: '0 14px 10px', flexWrap: 'wrap', flexShrink: 0 }}>
+              {['All', ...GEAR_CATEGORIES].map(cat => (
+                <button key={cat} onClick={() => setShopPickerCat(cat)} style={{ padding: '4px 8px', border: '1px solid var(--border2)', background: shopPickerCat === cat ? 'var(--teal)' : 'var(--white)', color: shopPickerCat === cat ? '#fff' : 'var(--text2)', fontSize: 11, cursor: 'pointer', borderRadius: 3, fontFamily: 'inherit' }}>{cat}</button>
+              ))}
+            </div>
+            <div style={{ overflowY: 'auto', flex: 1 }}>
+              {GEAR_DB
+                .filter(g => (shopPickerCat === 'All' || g.category === shopPickerCat) && (!shopPickerSearch.trim() || g.name.toLowerCase().includes(shopPickerSearch.toLowerCase())))
+                .map(g => {
+                  const already = (s.shop_items ?? []).some(i => i.name === g.name)
+                  const price = parseFloat(g.cost.replace(/[^0-9.]/g, '')) || 0
+                  return (
+                    <div
+                      key={g.name}
+                      onClick={() => !already && addShopFromDB(g)}
+                      style={{ display: 'flex', alignItems: 'center', padding: '11px 14px', borderBottom: '1px solid var(--border)', cursor: already ? 'default' : 'pointer', opacity: already ? 0.45 : 1 }}
+                      onMouseEnter={e => { if (!already) (e.currentTarget as HTMLElement).style.background = 'var(--teal-light)' }}
+                      onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = ''}
+                    >
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 14, fontWeight: 500 }}>{g.name}</div>
+                        <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 1 }}>{g.category}</div>
+                      </div>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: already ? 'var(--text3)' : 'var(--gold)', marginRight: 10 }}>{price > 0 ? `${price} gp` : g.cost}</span>
+                      <span style={{ fontSize: 12, color: already ? 'var(--text3)' : 'var(--teal2)', fontWeight: 600 }}>{already ? 'Added' : '+ Add'}</span>
+                    </div>
+                  )
+                })}
+            </div>
           </div>
         </div>
       )}
