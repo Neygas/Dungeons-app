@@ -238,18 +238,13 @@ export default function CharacterSheetScreen() {
         </div>
       )}
 
-      {/* Inspiration row */}
-      <div style={{ background: c.inspiration ? '#fffbeb' : 'var(--white)', border: `1px solid ${c.inspiration ? 'var(--gold)' : 'var(--border)'}`, padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', transition: 'all .3s' }}>
-        <span style={{ fontSize: 13, fontWeight: c.inspiration ? 700 : 500, color: c.inspiration ? 'var(--gold)' : 'var(--text)', transition: 'color .3s' }}>
-          {c.inspiration ? 'Inspired!' : 'Inspiration'}
-        </span>
-        <div
-          onClick={() => useCharacterStore.getState().patchActiveCharacter({ inspiration: !c.inspiration })}
-          style={{ width: 44, height: 24, borderRadius: 12, border: `2px solid ${c.inspiration ? 'var(--gold)' : 'var(--border2)'}`, background: c.inspiration ? 'var(--gold)' : 'var(--border)', cursor: 'pointer', position: 'relative', transition: 'all .2s', flexShrink: 0 }}
-        >
-          <div style={{ position: 'absolute', top: 2, left: c.inspiration ? 18 : 2, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left .2s' }} />
+      {/* Inspiration row — read-only, granted by DM only */}
+      {c.inspiration && (
+        <div style={{ background: '#fffbeb', border: '1px solid var(--gold)', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 16 }}>⭐</span>
+          <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--gold)' }}>You have Inspiration!</span>
         </div>
-      </div>
+      )}
 
       {/* ── STATS SECTION ── */}
       <div id="section-stats" style={{ paddingTop: 8 }}>

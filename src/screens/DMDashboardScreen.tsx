@@ -4,8 +4,9 @@ import { useSessionStore } from '@/store/sessionStore'
 import { CONDITIONS } from '@/data/conditions'
 import { GEAR_DB, GEAR_CATEGORIES } from '@/data/gear'
 import { PREMADE_LOOT_POOLS, RARITY_COLORS, RARITY_LABELS, type LootTemplate } from '@/data/lootTemplates'
+import { CREATURE_DB } from '@/data/creatures'
 import { hpColor, calcArmorAC, passivePerception, mod } from '@/lib/calculations'
-import type { Character, InitiativeEntry, LootItem, ShopItem, LootRarity } from '@/types'
+import type { Character, InitiativeEntry, LootItem, ShopItem, LootRarity, CreatureAttack } from '@/types'
 
 const TEMPLATES_KEY = 'dnd_loot_templates'
 function loadTemplates(): LootTemplate[] {
@@ -74,8 +75,22 @@ function PlayerCard({ char, sessionId, isTurn }: { char: Character; sessionId: s
     const num = parseInt(trimmed.replace('+', ''))
     if (isNaN(num)) return
     setApplying(true)
-    const newHp = Math.min(char.max_hp, Math.max(0, char.hp + num))
-    const hpUpdates: Partial<Character> = { hp: newHp }
+
+    let newHp = char.hp
+    let newTempHp = char.temp_hp ?? 0
+
+    if (num < 0) {
+      // Damage: temp HP absorbs first
+      const damage = Math.abs(num)
+      const absorbed = Math.min(newTempHp, damage)
+      newTempHp = newTempHp - absorbed
+      newHp = Math.max(0, newHp - (damage - absorbed))
+    } else {
+      // Healing never restores temp HP
+      newHp = Math.min(char.max_hp, newHp + num)
+    }
+
+    const hpUpdates: Partial<Character> = { hp: newHp, temp_hp: newTempHp }
     if (newHp === 0) {
       hpUpdates.death_successes = 0
       hpUpdates.death_failures = 0
@@ -84,7 +99,7 @@ function PlayerCard({ char, sessionId, isTurn }: { char: Character; sessionId: s
     }
     await dmPatchCharacter(char.id, hpUpdates)
     const desc = num < 0
-      ? `${char.name} took ${Math.abs(num)} damage (${char.hp} → ${newHp} HP)`
+      ? `${char.name} took ${Math.abs(num)} damage (${char.hp} → ${newHp} HP${newTempHp !== (char.temp_hp ?? 0) ? `, ${char.temp_hp ?? 0} → ${newTempHp} temp` : ''})`
       : `${char.name} healed ${num} HP (${char.hp} → ${newHp} HP)`
     await logEntry(sessionId, char.name, 'hp_change', desc, { delta: num, before: char.hp, after: newHp }, char.id)
     setHpDelta('')
@@ -119,7 +134,12 @@ function PlayerCard({ char, sessionId, isTurn }: { char: Character; sessionId: s
             : <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--teal2)' }}>{initials}</span>}
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontWeight: 700, fontSize: 14, color: isTurn ? 'var(--teal2)' : 'var(--text)' }}>{char.name}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            <span style={{ fontWeight: 700, fontSize: 14, color: isTurn ? 'var(--teal2)' : 'var(--text)' }}>{char.name}</span>
+            {char.inspiration && (
+              <span title="Has Inspiration" style={{ fontSize: 12, lineHeight: 1 }}>⭐</span>
+            )}
+          </div>
           <div style={{ fontSize: 11, color: 'var(--text3)' }}>Lvl {char.level} {char.race} {char.class}</div>
         </div>
         <div style={{ display: 'flex', gap: 10, flexShrink: 0 }}>
@@ -232,41 +252,70 @@ function InitEntryRow({ entry, idx, isCurrent, chars, onHpChange, onRemove }: {
   onHpChange: (idx: number, newHp: number) => void
   onRemove: (idx: number) => void
 }) {
+  const [showAttacks, setShowAttacks] = useState(false)
   const char = entry.characterId ? chars.find(c => c.id === entry.characterId) : null
   const hp = char ? char.hp : (entry.hp ?? 0)
   const maxHp = char ? char.max_hp : (entry.maxHp ?? 1)
   const pct = maxHp > 0 ? hp / maxHp : 0
+  const attacks = entry.attacks ?? []
 
   return (
     <div style={{
-      display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px',
       background: isCurrent ? 'var(--teal-light)' : 'var(--white)',
       border: `1px solid ${isCurrent ? 'var(--teal)' : 'var(--border)'}`,
       borderTop: 'none', transition: 'all .2s',
     }}>
-      <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--teal2)', width: 28, textAlign: 'center', flexShrink: 0 }}>{entry.initiative}</span>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 13, fontWeight: 600 }}>{entry.name}</div>
-        <div style={{ background: 'var(--border)', height: 3, borderRadius: 2, marginTop: 3 }}>
-          <div style={{ height: 3, borderRadius: 2, background: hpColor(pct), width: `${Math.max(0, Math.min(100, pct * 100))}%` }} />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px' }}>
+        <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--teal2)', width: 28, textAlign: 'center', flexShrink: 0 }}>{entry.initiative}</span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontSize: 13, fontWeight: 600 }}>{entry.name}</span>
+            {entry.ac != null && <span style={{ fontSize: 10, color: 'var(--text3)', fontWeight: 600 }}>AC {entry.ac}</span>}
+          </div>
+          <div style={{ background: 'var(--border)', height: 3, borderRadius: 2, marginTop: 3 }}>
+            <div style={{ height: 3, borderRadius: 2, background: hpColor(pct), width: `${Math.max(0, Math.min(100, pct * 100))}%` }} />
+          </div>
         </div>
+        {attacks.length > 0 && (
+          <button
+            onClick={() => setShowAttacks(v => !v)}
+            style={{ fontSize: 10, padding: '2px 6px', border: '1px solid var(--border2)', background: showAttacks ? 'var(--orange)' : 'var(--white)', color: showAttacks ? '#fff' : 'var(--text2)', borderRadius: 2, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600, flexShrink: 0 }}
+          >
+            ⚔ {showAttacks ? 'Hide' : 'Atk'}
+          </button>
+        )}
+        {!entry.isPlayer ? (
+          <>
+            <input
+              type="number"
+              defaultValue={hp}
+              onBlur={e => onHpChange(idx, parseInt(e.target.value) || 0)}
+              style={{ width: 44, border: 'none', borderBottom: '1px solid var(--border2)', background: 'transparent', textAlign: 'center', fontSize: 13, fontFamily: 'inherit', outline: 'none', padding: '1px 2px', color: hpColor(pct) }}
+            />
+            <span style={{ fontSize: 11, color: 'var(--text3)' }}>/{maxHp}</span>
+            <button onClick={() => onRemove(idx)} style={{ background: 'none', border: 'none', color: 'var(--red)', cursor: 'pointer', fontSize: 14, padding: '0 2px', fontFamily: 'inherit' }}>✕</button>
+          </>
+        ) : (
+          <span style={{ fontSize: 13, fontWeight: 700, color: hpColor(pct) }}>{hp}/{maxHp}</span>
+        )}
+        {isCurrent && (
+          <span style={{ fontSize: 9, fontWeight: 700, color: '#fff', background: 'var(--teal)', padding: '2px 5px', borderRadius: 2, letterSpacing: .5, textTransform: 'uppercase' }}>TURN</span>
+        )}
       </div>
-      {!entry.isPlayer ? (
-        <>
-          <input
-            type="number"
-            defaultValue={hp}
-            onBlur={e => onHpChange(idx, parseInt(e.target.value) || 0)}
-            style={{ width: 44, border: 'none', borderBottom: '1px solid var(--border2)', background: 'transparent', textAlign: 'center', fontSize: 13, fontFamily: 'inherit', outline: 'none', padding: '1px 2px', color: hpColor(pct) }}
-          />
-          <span style={{ fontSize: 11, color: 'var(--text3)' }}>/{maxHp}</span>
-          <button onClick={() => onRemove(idx)} style={{ background: 'none', border: 'none', color: 'var(--red)', cursor: 'pointer', fontSize: 14, padding: '0 2px', fontFamily: 'inherit' }}>✕</button>
-        </>
-      ) : (
-        <span style={{ fontSize: 13, fontWeight: 700, color: hpColor(pct) }}>{hp}/{maxHp}</span>
-      )}
-      {isCurrent && (
-        <span style={{ fontSize: 9, fontWeight: 700, color: '#fff', background: 'var(--teal)', padding: '2px 5px', borderRadius: 2, letterSpacing: .5, textTransform: 'uppercase' }}>TURN</span>
+      {showAttacks && attacks.length > 0 && (
+        <div style={{ padding: '0 12px 10px 48px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {attacks.map((atk, i) => (
+            <div key={i} style={{ fontSize: 11, color: 'var(--text2)', background: 'var(--bg)', padding: '4px 8px', borderRadius: 3, lineHeight: 1.5 }}>
+              <span style={{ fontWeight: 700, color: 'var(--orange)' }}>{atk.name}</span>
+              {' '}
+              <span style={{ color: 'var(--teal2)' }}>+{atk.attackBonus} to hit</span>
+              {atk.damageDice !== '0' && <span> · <span style={{ fontWeight: 600 }}>{atk.damageDice}</span> {atk.damageType}</span>}
+              {atk.savingThrow && (
+                <span style={{ color: 'var(--purple)' }}> · DC {atk.savingThrow.dc} {atk.savingThrow.ability} save: {atk.savingThrow.effect}</span>
+              )}
+            </div>
+          ))}
+        </div>
       )}
     </div>
   )
@@ -290,7 +339,23 @@ export default function DMDashboardScreen() {
   const [playerInits, setPlayerInits] = useState<Record<string, string>>({})
   const [enemyName, setEnemyName] = useState('')
   const [enemyHp, setEnemyHp] = useState('')
+  const [enemyAc, setEnemyAc] = useState('')
   const [enemyInit, setEnemyInit] = useState('')
+
+  // Enemy add mode
+  const [enemyMode, setEnemyMode] = useState<'custom' | 'db'>('custom')
+  const [enemyDbSearch, setEnemyDbSearch] = useState('')
+  const [pendingAttacks, setPendingAttacks] = useState<CreatureAttack[]>([])
+
+  // Custom attack builder
+  const [atkName, setAtkName] = useState('')
+  const [atkBonus, setAtkBonus] = useState('')
+  const [atkDamage, setAtkDamage] = useState('')
+  const [atkType, setAtkType] = useState('')
+  const [atkHasSave, setAtkHasSave] = useState(false)
+  const [atkSaveAbility, setAtkSaveAbility] = useState('CON')
+  const [atkSaveDc, setAtkSaveDc] = useState('')
+  const [atkSaveEffect, setAtkSaveEffect] = useState('')
 
   // Loot
   const [customLootName, setCustomLootName] = useState('')
@@ -366,6 +431,7 @@ export default function DMDashboardScreen() {
   const addEnemy = () => {
     if (!enemyName.trim()) return
     const hp = parseInt(enemyHp) || 10
+    const ac = parseInt(enemyAc) || undefined
     const newEntry: InitiativeEntry = {
       id: `enemy-${Date.now()}`,
       name: enemyName.trim(),
@@ -373,10 +439,27 @@ export default function DMDashboardScreen() {
       isPlayer: false,
       hp,
       maxHp: hp,
+      ac,
+      attacks: pendingAttacks.length > 0 ? [...pendingAttacks] : undefined,
     }
     const updated = [...s.initiative, newEntry].sort((a, b) => b.initiative - a.initiative)
     setInitiative(updated)
-    setEnemyName(''); setEnemyHp(''); setEnemyInit('')
+    setEnemyName(''); setEnemyHp(''); setEnemyAc(''); setEnemyInit('')
+    setPendingAttacks([])
+  }
+
+  const addCustomAttack = () => {
+    if (!atkName.trim() || !atkDamage.trim()) return
+    const attack: CreatureAttack = {
+      name: atkName.trim(),
+      attackBonus: parseInt(atkBonus) || 0,
+      damageDice: atkDamage.trim(),
+      damageType: atkType.trim() || 'unspecified',
+      savingThrow: atkHasSave ? { ability: atkSaveAbility, dc: parseInt(atkSaveDc) || 10, effect: atkSaveEffect.trim() } : null,
+    }
+    setPendingAttacks(p => [...p, attack])
+    setAtkName(''); setAtkBonus(''); setAtkDamage(''); setAtkType('')
+    setAtkHasSave(false); setAtkSaveDc(''); setAtkSaveEffect('')
   }
 
   const updateEnemyHp = (idx: number, newHp: number) => {
@@ -623,36 +706,104 @@ export default function DMDashboardScreen() {
 
           {/* Add enemy */}
           <div style={{ background: 'var(--white)', border: '1px solid var(--border)', borderTop: 'none', padding: '12px 14px' }}>
-            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 10 }}>Add Enemy</div>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              <input
-                value={enemyName}
-                onChange={e => setEnemyName(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && addEnemy()}
-                placeholder="Name"
-                style={{ flex: 2, minWidth: 80, border: 'none', borderBottom: '1px solid var(--border2)', background: 'transparent', fontSize: 14, fontFamily: 'inherit', outline: 'none', padding: '5px 2px' }}
-              />
-              <input
-                value={enemyHp}
-                onChange={e => setEnemyHp(e.target.value)}
-                placeholder="HP"
-                type="number"
-                style={{ width: 60, border: 'none', borderBottom: '1px solid var(--border2)', background: 'transparent', fontSize: 14, fontFamily: 'inherit', outline: 'none', padding: '5px 2px', textAlign: 'center' }}
-              />
-              <input
-                value={enemyInit}
-                onChange={e => setEnemyInit(e.target.value)}
-                placeholder="Init"
-                type="number"
-                style={{ width: 55, border: 'none', borderBottom: '1px solid var(--border2)', background: 'transparent', fontSize: 14, fontFamily: 'inherit', outline: 'none', padding: '5px 2px', textAlign: 'center' }}
-              />
-              <button
-                onClick={addEnemy}
-                style={{ padding: '5px 14px', background: 'var(--teal)', color: '#fff', border: 'none', fontSize: 13, fontWeight: 600, cursor: 'pointer', borderRadius: 2, fontFamily: 'inherit' }}
-              >
-                + Add
-              </button>
+            {/* Mode toggle */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.5px' }}>Add Enemy</div>
+              <div style={{ display: 'flex', border: '1px solid var(--border2)', borderRadius: 3, overflow: 'hidden' }}>
+                <button onClick={() => setEnemyMode('custom')} style={{ padding: '4px 10px', background: enemyMode === 'custom' ? 'var(--teal)' : 'var(--white)', color: enemyMode === 'custom' ? '#fff' : 'var(--text2)', fontSize: 11, border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}>Custom</button>
+                <button onClick={() => setEnemyMode('db')} style={{ padding: '4px 10px', background: enemyMode === 'db' ? 'var(--teal)' : 'var(--white)', color: enemyMode === 'db' ? '#fff' : 'var(--text2)', fontSize: 11, border: 'none', borderLeft: '1px solid var(--border2)', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}>From Database</button>
+              </div>
             </div>
+
+            {/* Database picker */}
+            {enemyMode === 'db' && (
+              <div style={{ marginBottom: 10 }}>
+                <input
+                  value={enemyDbSearch}
+                  onChange={e => setEnemyDbSearch(e.target.value)}
+                  placeholder="Search creatures..."
+                  style={{ display: 'block', width: '100%', border: '1px solid var(--border2)', borderRadius: 3, padding: '7px 10px', fontSize: 13, fontFamily: 'inherit', outline: 'none', marginBottom: 6, boxSizing: 'border-box' }}
+                />
+                <div style={{ maxHeight: 180, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 3 }}>
+                  {CREATURE_DB
+                    .filter(c => !enemyDbSearch.trim() || c.name.toLowerCase().includes(enemyDbSearch.toLowerCase()))
+                    .map(c => (
+                      <div
+                        key={c.name}
+                        onClick={() => {
+                          setEnemyName(c.name)
+                          setEnemyHp(String(c.hp))
+                          setEnemyAc(String(c.ac))
+                          setPendingAttacks(c.attacks)
+                          setEnemyDbSearch('')
+                        }}
+                        style={{ padding: '8px 10px', cursor: 'pointer', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                        onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--teal-light)'}
+                        onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = ''}
+                      >
+                        <span style={{ fontSize: 13, fontWeight: 600 }}>{c.name}</span>
+                        <span style={{ fontSize: 11, color: 'var(--text3)' }}>CR {c.cr} · AC {c.ac} · {c.hp} HP</span>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
+
+            {/* Name / HP / AC / Init fields */}
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+              <input value={enemyName} onChange={e => setEnemyName(e.target.value)} placeholder="Name" style={{ flex: 2, minWidth: 80, border: 'none', borderBottom: '1px solid var(--border2)', background: 'transparent', fontSize: 14, fontFamily: 'inherit', outline: 'none', padding: '5px 2px' }} />
+              <input value={enemyHp} onChange={e => setEnemyHp(e.target.value)} placeholder="HP" type="number" style={{ width: 52, border: 'none', borderBottom: '1px solid var(--border2)', background: 'transparent', fontSize: 14, fontFamily: 'inherit', outline: 'none', padding: '5px 2px', textAlign: 'center' }} />
+              <input value={enemyAc} onChange={e => setEnemyAc(e.target.value)} placeholder="AC" type="number" style={{ width: 48, border: 'none', borderBottom: '1px solid var(--border2)', background: 'transparent', fontSize: 14, fontFamily: 'inherit', outline: 'none', padding: '5px 2px', textAlign: 'center' }} />
+              <input value={enemyInit} onChange={e => setEnemyInit(e.target.value)} placeholder="Init" type="number" style={{ width: 48, border: 'none', borderBottom: '1px solid var(--border2)', background: 'transparent', fontSize: 14, fontFamily: 'inherit', outline: 'none', padding: '5px 2px', textAlign: 'center' }} />
+            </div>
+
+            {/* Pending attacks list */}
+            {pendingAttacks.length > 0 && (
+              <div style={{ marginBottom: 8, display: 'flex', flexDirection: 'column', gap: 3 }}>
+                {pendingAttacks.map((atk, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 8px', background: 'var(--bg)', borderRadius: 3, fontSize: 11 }}>
+                    <span style={{ flex: 1, color: 'var(--text2)' }}>
+                      <span style={{ fontWeight: 700 }}>{atk.name}</span> +{atk.attackBonus} · {atk.damageDice} {atk.damageType}
+                      {atk.savingThrow && <span style={{ color: 'var(--purple)' }}> · DC {atk.savingThrow.dc} {atk.savingThrow.ability}</span>}
+                    </span>
+                    <button onClick={() => setPendingAttacks(p => p.filter((_, j) => j !== i))} style={{ background: 'none', border: 'none', color: 'var(--red)', cursor: 'pointer', fontSize: 12, padding: 0, fontFamily: 'inherit' }}>✕</button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Custom attack builder */}
+            {enemyMode === 'custom' && (
+              <div style={{ marginBottom: 8, padding: '8px 10px', background: 'var(--bg)', borderRadius: 3 }}>
+                <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 6 }}>Add Attack</div>
+                <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 5 }}>
+                  <input value={atkName} onChange={e => setAtkName(e.target.value)} placeholder="Name" style={{ flex: 2, minWidth: 70, border: 'none', borderBottom: '1px solid var(--border2)', background: 'transparent', fontSize: 12, fontFamily: 'inherit', outline: 'none', padding: '3px 2px' }} />
+                  <input value={atkBonus} onChange={e => setAtkBonus(e.target.value)} placeholder="+hit" type="number" style={{ width: 44, border: 'none', borderBottom: '1px solid var(--border2)', background: 'transparent', fontSize: 12, fontFamily: 'inherit', outline: 'none', padding: '3px 2px', textAlign: 'center' }} />
+                  <input value={atkDamage} onChange={e => setAtkDamage(e.target.value)} placeholder="1d6+2" style={{ width: 56, border: 'none', borderBottom: '1px solid var(--border2)', background: 'transparent', fontSize: 12, fontFamily: 'inherit', outline: 'none', padding: '3px 2px', textAlign: 'center' }} />
+                  <input value={atkType} onChange={e => setAtkType(e.target.value)} placeholder="type" style={{ width: 60, border: 'none', borderBottom: '1px solid var(--border2)', background: 'transparent', fontSize: 12, fontFamily: 'inherit', outline: 'none', padding: '3px 2px' }} />
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: atkHasSave ? 6 : 0 }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'var(--text2)', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={atkHasSave} onChange={e => setAtkHasSave(e.target.checked)} />
+                    Saving throw
+                  </label>
+                  <button onClick={addCustomAttack} disabled={!atkName.trim() || !atkDamage.trim()} style={{ marginLeft: 'auto', padding: '3px 10px', background: 'var(--teal)', color: '#fff', border: 'none', fontSize: 11, fontWeight: 600, cursor: 'pointer', borderRadius: 2, fontFamily: 'inherit', opacity: (!atkName.trim() || !atkDamage.trim()) ? 0.5 : 1 }}>+ Add Attack</button>
+                </div>
+                {atkHasSave && (
+                  <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                    <select value={atkSaveAbility} onChange={e => setAtkSaveAbility(e.target.value)} style={{ border: 'none', borderBottom: '1px solid var(--border2)', background: 'transparent', fontSize: 12, fontFamily: 'inherit', outline: 'none', padding: '3px 2px' }}>
+                      {['STR','DEX','CON','INT','WIS','CHA'].map(a => <option key={a}>{a}</option>)}
+                    </select>
+                    <input value={atkSaveDc} onChange={e => setAtkSaveDc(e.target.value)} placeholder="DC" type="number" style={{ width: 44, border: 'none', borderBottom: '1px solid var(--border2)', background: 'transparent', fontSize: 12, fontFamily: 'inherit', outline: 'none', padding: '3px 2px', textAlign: 'center' }} />
+                    <input value={atkSaveEffect} onChange={e => setAtkSaveEffect(e.target.value)} placeholder="Effect on fail" style={{ flex: 1, minWidth: 100, border: 'none', borderBottom: '1px solid var(--border2)', background: 'transparent', fontSize: 12, fontFamily: 'inherit', outline: 'none', padding: '3px 2px' }} />
+                  </div>
+                )}
+              </div>
+            )}
+
+            <button onClick={addEnemy} disabled={!enemyName.trim()} style={{ padding: '7px 16px', background: enemyName.trim() ? 'var(--teal)' : 'var(--border)', color: enemyName.trim() ? '#fff' : 'var(--text3)', border: 'none', fontSize: 13, fontWeight: 600, cursor: enemyName.trim() ? 'pointer' : 'not-allowed', borderRadius: 2, fontFamily: 'inherit' }}>
+              + Add to Combat
+            </button>
           </div>
         </div>
       )}

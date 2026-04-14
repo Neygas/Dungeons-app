@@ -167,12 +167,22 @@ export interface Character {
 export type CharacterDraft = Omit<Character, 'id' | 'user_id' | 'created_at' | 'updated_at'>
 
 // ===== SESSION =====
+export interface CreatureAttack {
+  name: string
+  attackBonus: number
+  damageDice: string
+  damageType: string
+  savingThrow?: { ability: string; dc: number; effect: string } | null
+}
+
 export interface Enemy {
   id: string
   name: string
   hp: number
   maxHp: number
+  ac?: number
   initiative?: number
+  attacks?: CreatureAttack[]
 }
 
 export interface InitiativeEntry {
@@ -183,6 +193,8 @@ export interface InitiativeEntry {
   characterId?: string
   hp?: number
   maxHp?: number
+  ac?: number
+  attacks?: CreatureAttack[]
 }
 
 export interface ShopItem {
