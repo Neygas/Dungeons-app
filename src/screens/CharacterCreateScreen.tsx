@@ -3,12 +3,12 @@ import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/store/authStore'
 import { useCharacterStore } from '@/store/characterStore'
 import type { WizardState } from '@/types'
-import { RACE_NAMES, CLASS_NAMES, BACKGROUND_NAMES, ALIGNMENTS, CLASSES, CLASS_HD, SPELL_SLOTS_TABLE, BACKGROUNDS } from '@/data'
+import { RACE_NAMES, CLASS_NAMES, BACKGROUND_NAMES, ALIGNMENTS, CLASSES, CLASS_HD, SPELL_SLOTS_TABLE, BACKGROUNDS, SUBCLASS_LEVEL, SUBCLASS_LABEL, SUBCLASSES } from '@/data'
 import { AB_KEYS, AB_LABEL, POINT_BUY_COST, STANDARD_ARRAY } from '@/data'
 import { mod, averageHpGain, rollDie } from '@/lib/calculations'
 
 const INIT_WIZ: WizardState = {
-  name: '', race: 'Human', class: 'Fighter', level: 1, hpMode: 'avg',
+  name: '', race: 'Human', subrace: '', class: 'Fighter', subclass: '', level: 1, hpMode: 'avg',
   system: 'custom', str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10,
   background: 'Acolyte', alignment: 'True Neutral',
   personality: '', ideals: '', bonds: '', flaws: '', about: '', skills: [],
@@ -31,7 +31,7 @@ function Step1({ wiz, setWiz }: { wiz: WizardState; setWiz: (w: WizardState) => 
         </div>
         <div style={{ flex: 1, marginBottom: 16 }}>
           <label style={lbl}>Class</label>
-          <select value={wiz.class} onChange={e => f('class', e.target.value)} style={sel}>
+          <select value={wiz.class} onChange={e => setWiz({ ...wiz, class: e.target.value, subclass: '' })} style={sel}>
             {CLASS_NAMES.map(c => <option key={c}>{c}</option>)}
           </select>
         </div>
@@ -39,7 +39,7 @@ function Step1({ wiz, setWiz }: { wiz: WizardState; setWiz: (w: WizardState) => 
       <div style={{ display: 'flex', gap: 12 }}>
         <div style={{ flex: 1, marginBottom: 16 }}>
           <label style={lbl}>Level</label>
-          <select value={wiz.level} onChange={e => f('level', Number(e.target.value))} style={sel}>
+          <select value={wiz.level} onChange={e => setWiz({ ...wiz, level: Number(e.target.value), subclass: '' })} style={sel}>
             {Array.from({ length: 20 }, (_, i) => i + 1).map(l => <option key={l} value={l}>{l}</option>)}
           </select>
         </div>
@@ -52,6 +52,19 @@ function Step1({ wiz, setWiz }: { wiz: WizardState; setWiz: (w: WizardState) => 
           </select>
         </div>
       </div>
+      {wiz.level >= (SUBCLASS_LEVEL[wiz.class] ?? 99) ? (
+        <div style={{ marginBottom: 16 }}>
+          <label style={lbl}>{SUBCLASS_LABEL[wiz.class] ?? 'Subclass'}</label>
+          <select value={wiz.subclass} onChange={e => f('subclass', e.target.value)} style={sel}>
+            <option value="">-- Select --</option>
+            {(SUBCLASSES[wiz.class] ?? []).map(sc => <option key={sc.name} value={sc.name}>{sc.name}</option>)}
+          </select>
+        </div>
+      ) : (
+        <div style={{ background: 'var(--bg)', borderLeft: '3px solid var(--border2)', padding: '8px 12px', fontSize: 12, color: 'var(--text3)', marginBottom: 16 }}>
+          You will choose your {SUBCLASS_LABEL[wiz.class] ?? 'subclass'} at level {SUBCLASS_LEVEL[wiz.class] ?? '?'}.
+        </div>
+      )}
       <div style={{ background: 'var(--teal-light)', borderLeft: '3px solid var(--teal)', padding: '9px 12px', fontSize: 13, color: 'var(--teal2)' }}>
         <strong>{wiz.class}</strong> — Hit Die: d{CLASS_HD[wiz.class]}, Saves: {CLASSES[wiz.class].save.join(' & ')}
       </div>
@@ -184,7 +197,7 @@ function Step4({ wiz }: { wiz: WizardState }) {
   return (
     <div style={{ fontSize: 14 }}>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 16px' }}>
-        {[['Name', wiz.name || '—'], ['Race', wiz.race], ['Class', wiz.class], ['Level', String(wiz.level)], ['Background', wiz.background], ['Alignment', wiz.alignment]].map(([k, v]) => (
+        {([['Name', wiz.name || '—'], ['Race', wiz.race], ['Class', wiz.subclass ? `${wiz.class} (${wiz.subclass})` : wiz.class], ['Level', String(wiz.level)], ['Background', wiz.background], ['Alignment', wiz.alignment]] as [string, string][]).map(([k, v]) => (
           <div key={k}>
             <span style={{ fontWeight: 600, color: 'var(--text3)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.5px' }}>{k}</span>
             <div style={{ color: 'var(--text)', marginTop: 2 }}>{v}</div>
@@ -263,6 +276,7 @@ export default function CharacterCreateScreen() {
         name: wiz.name.trim(),
         race: wiz.race,
         class: wiz.class,
+        subclass: wiz.subclass || undefined,
         level: wiz.level,
         background: wiz.background,
         alignment: wiz.alignment,

@@ -168,7 +168,12 @@ export default function CharacterSheetScreen() {
               <div style={{ flex: 1, minWidth: 0 }}>
                 {/* Name — gold when inspired */}
                 <div style={{ fontSize: 18, fontWeight: 700, color: c.inspiration ? 'var(--gold)' : '#fff', lineHeight: 1.2, transition: 'color .3s' }}>{c.name}</div>
-                <div style={{ fontSize: 12, color: 'rgba(255,255,255,.8)', marginTop: 2 }}>Level {lvl} {c.race} {c.class}</div>
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,.8)', marginTop: 2 }}>
+                  Level {lvl} {c.race}{' '}
+                  {c.classes && c.classes.length > 1
+                    ? c.classes.map(cl => `${cl.name} ${cl.level}`).join(' / ')
+                    : c.subclass ? `${c.class} (${c.subclass})` : c.class}
+                </div>
                 <div style={{ fontSize: 11, color: 'rgba(255,255,255,.65)', marginTop: 1 }}>{c.background} · {c.alignment}</div>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-end' }}>

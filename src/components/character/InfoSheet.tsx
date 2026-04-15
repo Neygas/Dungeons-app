@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { Character } from '@/types'
-import { RACES, CLASSES, BACKGROUNDS, LEVEL_UP_FEATURES, XP_TABLE, CLASS_HD, SPELL_SLOTS_TABLE } from '@/data'
+import { RACES, CLASSES, BACKGROUNDS, LEVEL_UP_FEATURES, XP_TABLE, CLASS_HD, SPELL_SLOTS_TABLE, CLASS_NAMES, SUBCLASS_LEVEL, SUBCLASS_LABEL, SUBCLASSES, MULTICLASS_PREREQS, AB_LABEL } from '@/data'
 import { mod, profBonus, averageHpGain, rollDie } from '@/lib/calculations'
 import { useCharacterStore } from '@/store/characterStore'
 import { useUIStore } from '@/store/uiStore'
@@ -61,20 +61,46 @@ function DetailPopup({ title, desc, onClose }: { title: string; desc: string; on
 }
 
 // ── Level Up Modal ─────────────────────────────────────────────────────────────
+type LevelUpPhase = 'class' | 'subclass' | 'asi' | 'hp' | 'done'
+
 function LevelUpModal({ character: c, onClose }: { character: Character; onClose: () => void }) {
   const { patchActiveCharacter } = useCharacterStore()
   const { showToast } = useUIStore()
+
+  const existingClasses = c.classes ?? [{ name: c.class, level: c.level }]
+
+  const [phase, setPhase] = useState<LevelUpPhase>('class')
+  const [chosenClass, setChosenClass] = useState(c.class)
+  const [addingNew, setAddingNew] = useState(false)
+  const [newClassInput, setNewClassInput] = useState('')
+  const [subclassChoice, setSubclassChoice] = useState(SUBCLASSES[c.class]?.[0]?.name ?? '')
+  const [asiMode, setAsiMode] = useState<'points' | 'feat'>('points')
+  const [asiDeltas, setAsiDeltas] = useState<Record<string, number>>({})
+  const [featName, setFeatName] = useState('')
   const [hpMode, setHpMode] = useState<'avg' | 'roll' | 'manual'>('avg')
   const [manualHp, setManualHp] = useState('')
-  const [done, setDone] = useState(false)
+  const [rolledGain, setRolledGain] = useState(() => rollDie(CLASS_HD[c.class] ?? 8))
 
-  const newLevel = c.level + 1
-  const hd = CLASS_HD[c.class] ?? 8
+  const isNewMulticlass = addingNew
+  const levelingClass = isNewMulticlass ? newClassInput : chosenClass
+  const levelingClassCurrentLevel = isNewMulticlass
+    ? 0
+    : (existingClasses.find(cl => cl.name === chosenClass)?.level ?? c.level)
+  const levelingClassNewLevel = levelingClassCurrentLevel + 1
+
+  const hd = CLASS_HD[levelingClass] ?? 8
   const avgGain = averageHpGain(hd)
-  const rolledGain = rollDie(hd)
   const conMod = mod(c.con)
-  const newFeatures = LEVEL_UP_FEATURES[c.class]?.[newLevel] ?? []
-  const newSlots = SPELL_SLOTS_TABLE[c.class]?.[newLevel - 1] ?? null
+  const newFeatures = LEVEL_UP_FEATURES[levelingClass]?.[levelingClassNewLevel] ?? []
+  const needsSubclass = !c.subclass && levelingClassNewLevel === (SUBCLASS_LEVEL[levelingClass] ?? -1)
+  const hasASI = !isNewMulticlass && newFeatures.includes('Ability Score Improvement')
+
+  const availableNewClasses = CLASS_NAMES.filter(cn => !existingClasses.some(cl => cl.name === cn))
+  const prereqs = MULTICLASS_PREREQS[newClassInput] ?? []
+  const prereqsMet = prereqs.every(p => (c[p.ability as keyof Character] as number) >= p.score)
+
+  const asiPointsUsed = Object.values(asiDeltas).reduce((s, v) => s + v, 0)
+  const asiPointsLeft = 2 - asiPointsUsed
 
   const getHpGain = () => {
     if (hpMode === 'avg') return avgGain + conMod
@@ -82,53 +108,230 @@ function LevelUpModal({ character: c, onClose }: { character: Character; onClose
     return Math.max(1, parseInt(manualHp) || 1) + conMod
   }
 
+  const handlePickClass = (cls: string) => {
+    setChosenClass(cls)
+    setAddingNew(false)
+    setNewClassInput('')
+    setSubclassChoice(SUBCLASSES[cls]?.[0]?.name ?? '')
+  }
+
+  const handleNewClassChange = (cls: string) => {
+    setNewClassInput(cls)
+    setSubclassChoice(SUBCLASSES[cls]?.[0]?.name ?? '')
+  }
+
+  const advanceFromClass = () => {
+    const cls = isNewMulticlass ? newClassInput : chosenClass
+    setRolledGain(rollDie(CLASS_HD[cls] ?? 8))
+    if (needsSubclass) { setPhase('subclass'); return }
+    if (hasASI) { setPhase('asi'); return }
+    setPhase('hp')
+  }
+
+  const advanceFromSubclass = () => {
+    if (hasASI) { setPhase('asi'); return }
+    setPhase('hp')
+  }
+
   const doLevelUp = async () => {
     const hpGain = Math.max(1, getHpGain())
-    const updates: Partial<Character> = {
-      level: newLevel,
+    const newTotalLevel = c.level + 1
+    const updates: Partial<Character> & Record<string, unknown> = {
+      level: newTotalLevel,
       max_hp: c.max_hp + hpGain,
       hp: c.hp + hpGain,
-      hit_dice_total: newLevel,
+      hit_dice_total: newTotalLevel,
     }
+
+    if (needsSubclass && subclassChoice) {
+      updates.subclass = subclassChoice
+    }
+
+    if (hasASI && asiMode === 'points') {
+      for (const stat of ['str', 'dex', 'con', 'int', 'wis', 'cha'] as const) {
+        const delta = asiDeltas[stat] ?? 0
+        if (delta > 0) {
+          updates[stat] = Math.min(20, (c[stat] as number) + delta)
+        }
+      }
+    }
+
+    if (isNewMulticlass && newClassInput) {
+      const base = c.classes ?? [{ name: c.class, level: c.level }]
+      updates.classes = [...base, { name: newClassInput, level: 1 }]
+    } else if (c.classes) {
+      updates.classes = c.classes.map(cl =>
+        cl.name === chosenClass ? { ...cl, level: cl.level + 1 } : cl
+      )
+    }
+
+    const effectiveLevel = isNewMulticlass ? 1 : levelingClassNewLevel
+    const slotClass = isNewMulticlass ? newClassInput : chosenClass
+    const newSlots = SPELL_SLOTS_TABLE[slotClass]?.[effectiveLevel - 1] ?? null
     if (newSlots) updates.spell_slots_used = []
-    await patchActiveCharacter(updates)
-    showToast(`Level ${newLevel}! +${hpGain} HP`)
-    setDone(true)
+
+    await patchActiveCharacter(updates as Partial<Character>)
+    showToast(`Level ${newTotalLevel}! +${hpGain} HP`)
+    setPhase('done')
   }
+
+  const btnBase: React.CSSProperties = { display: 'block', width: '100%', padding: 13, border: 'none', fontSize: 15, fontWeight: 700, cursor: 'pointer', borderRadius: 4, fontFamily: 'inherit', marginTop: 8 }
+  const selCard = (active: boolean): React.CSSProperties => ({ display: 'block', width: '100%', padding: '12px 14px', marginBottom: 6, border: `2px solid ${active ? 'var(--teal)' : 'var(--border)'}`, background: active ? 'var(--teal-light)' : 'var(--white)', borderRadius: 4, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' as const, fontSize: 14, fontWeight: 600, color: active ? 'var(--teal2)' : 'var(--text)' })
 
   return (
     <div onClick={e => { if (e.target === e.currentTarget) onClose() }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 400, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
       <div style={{ background: 'var(--white)', width: '100%', maxWidth: 600, borderRadius: '14px 14px 0 0', maxHeight: '85vh', overflowY: 'auto', padding: '20px 16px 32px' }}>
+
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-          <div style={{ fontSize: 20, fontWeight: 700 }}>Level Up → {newLevel}</div>
-          <button onClick={onClose} style={{ width: 30, height: 30, border: 'none', background: 'var(--bg)', borderRadius: '50%', cursor: 'pointer', fontSize: 16, color: 'var(--text2)' }}>✕</button>
+          <div style={{ fontSize: 20, fontWeight: 700 }}>Level Up -&gt; {c.level + 1}</div>
+          <button onClick={onClose} style={{ width: 30, height: 30, border: 'none', background: 'var(--bg)', borderRadius: '50%', cursor: 'pointer', fontSize: 16, color: 'var(--text2)', fontFamily: 'inherit' }}>X</button>
         </div>
 
-        {done ? (
+        {phase === 'done' && (
           <div style={{ textAlign: 'center', padding: '20px 0' }}>
-            <div style={{ fontSize: 32, marginBottom: 8 }}>🎉</div>
-            <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--teal2)' }}>Welcome to level {newLevel}!</div>
+            <div style={{ fontSize: 32, marginBottom: 8 }}>!</div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--teal2)' }}>Welcome to level {c.level + 1}!</div>
             {newFeatures.length > 0 && (
               <div style={{ marginTop: 16, textAlign: 'left' }}>
                 <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 8 }}>New Features</div>
                 {newFeatures.map(f => (
-                  <div key={f} style={{ padding: '8px 12px', background: 'var(--teal-light)', border: '1px solid var(--teal)', borderRadius: 4, marginBottom: 6, fontSize: 14, fontWeight: 500, color: 'var(--teal2)' }}>★ {f}</div>
+                  <div key={f} style={{ padding: '8px 12px', background: 'var(--teal-light)', border: '1px solid var(--teal)', borderRadius: 4, marginBottom: 6, fontSize: 14, fontWeight: 500, color: 'var(--teal2)' }}>* {f}</div>
                 ))}
               </div>
             )}
-            <button onClick={onClose} style={{ marginTop: 20, display: 'block', width: '100%', padding: 12, background: 'var(--teal)', color: '#fff', border: 'none', fontSize: 15, fontWeight: 600, cursor: 'pointer', borderRadius: 4, fontFamily: 'inherit' }}>Done</button>
+            <button onClick={onClose} style={{ ...btnBase, background: 'var(--teal)', color: '#fff' }}>Done</button>
           </div>
-        ) : (
+        )}
+
+        {phase === 'class' && (
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 10 }}>Advance Which Class?</div>
+            {existingClasses.map(cl => (
+              <button key={cl.name} onClick={() => handlePickClass(cl.name)} style={selCard(!addingNew && chosenClass === cl.name)}>
+                {cl.name} <span style={{ fontWeight: 400, color: 'var(--text3)' }}>Level {cl.level}</span>
+              </button>
+            ))}
+            <button
+              onClick={() => { setAddingNew(true); setChosenClass('') }}
+              style={{ display: 'block', width: '100%', padding: '12px 14px', marginBottom: 6, border: `2px solid ${addingNew ? 'var(--purple)' : 'var(--border)'}`, background: addingNew ? 'var(--purple-light)' : 'var(--white)', borderRadius: 4, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', fontSize: 14, fontWeight: 600, color: addingNew ? 'var(--purple)' : 'var(--text2)' }}
+            >
+              + Multiclass into new class
+            </button>
+            {addingNew && (
+              <div style={{ marginBottom: 8 }}>
+                <select
+                  value={newClassInput}
+                  onChange={e => handleNewClassChange(e.target.value)}
+                  style={{ width: '100%', border: '1px solid var(--border2)', background: 'var(--white)', padding: '8px 10px', fontSize: 14, fontFamily: 'inherit', borderRadius: 3, outline: 'none', color: 'var(--text)', cursor: 'pointer', marginBottom: 6 }}
+                >
+                  <option value="">Select class...</option>
+                  {availableNewClasses.map(cn => <option key={cn} value={cn}>{cn}</option>)}
+                </select>
+                {newClassInput && (
+                  <div style={{ padding: '8px 12px', background: prereqsMet ? 'var(--teal-light)' : '#fde8e8', border: `1px solid ${prereqsMet ? 'var(--teal)' : 'var(--red)'}`, borderRadius: 3, fontSize: 12, color: prereqsMet ? 'var(--teal2)' : 'var(--red)' }}>
+                    {prereqs.length === 0
+                      ? 'No prerequisites required.'
+                      : prereqs.map(p => `${p.ability.toUpperCase()} ${p.score}+ (yours: ${(c[p.ability as keyof Character] as number)})`).join(', ')
+                    }
+                    {prereqs.length > 0 && <span style={{ fontWeight: 700 }}> - {prereqsMet ? 'Met!' : 'Not met'}</span>}
+                  </div>
+                )}
+              </div>
+            )}
+            <button
+              onClick={advanceFromClass}
+              disabled={addingNew ? (!newClassInput || !prereqsMet) : false}
+              style={{ ...btnBase, background: 'var(--teal)', color: '#fff', opacity: (addingNew && (!newClassInput || !prereqsMet)) ? 0.5 : 1, cursor: (addingNew && (!newClassInput || !prereqsMet)) ? 'not-allowed' : 'pointer' }}
+            >
+              Continue
+            </button>
+          </div>
+        )}
+
+        {phase === 'subclass' && (
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 4 }}>Choose Your {SUBCLASS_LABEL[levelingClass] ?? 'Subclass'}</div>
+            <div style={{ fontSize: 13, color: 'var(--text3)', marginBottom: 12 }}>{levelingClass} reaches level {levelingClassNewLevel} - time to specialize.</div>
+            <div style={{ maxHeight: 340, overflowY: 'auto', marginBottom: 8 }}>
+              {(SUBCLASSES[levelingClass] ?? []).map(sc => (
+                <button key={sc.name} onClick={() => setSubclassChoice(sc.name)} style={{ display: 'block', width: '100%', padding: '10px 14px', marginBottom: 6, border: `2px solid ${subclassChoice === sc.name ? 'var(--purple)' : 'var(--border)'}`, background: subclassChoice === sc.name ? 'var(--purple-light)' : 'var(--white)', borderRadius: 4, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: subclassChoice === sc.name ? 'var(--purple)' : 'var(--text)' }}>{sc.name}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 3, lineHeight: 1.4 }}>{sc.desc}</div>
+                </button>
+              ))}
+            </div>
+            <button onClick={advanceFromSubclass} disabled={!subclassChoice} style={{ ...btnBase, background: 'var(--purple)', color: '#fff', opacity: subclassChoice ? 1 : 0.5, cursor: subclassChoice ? 'pointer' : 'not-allowed' }}>
+              Choose {subclassChoice || '...'}
+            </button>
+          </div>
+        )}
+
+        {phase === 'asi' && (
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 6 }}>Ability Score Improvement</div>
+            <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+              {(['points', 'feat'] as const).map(m => (
+                <button key={m} onClick={() => setAsiMode(m)} style={{ flex: 1, padding: '8px 4px', border: `1px solid ${asiMode === m ? 'var(--teal)' : 'var(--border2)'}`, background: asiMode === m ? 'var(--teal)' : 'var(--white)', color: asiMode === m ? '#fff' : 'var(--text2)', fontSize: 13, cursor: 'pointer', borderRadius: 3, fontFamily: 'inherit', fontWeight: 500 }}>
+                  {m === 'points' ? '+2 to Stats' : 'Take a Feat'}
+                </button>
+              ))}
+            </div>
+            {asiMode === 'points' ? (
+              <div>
+                <div style={{ fontSize: 12, color: asiPointsLeft === 0 ? 'var(--teal2)' : 'var(--text3)', marginBottom: 10, fontWeight: 600 }}>
+                  Points remaining: {asiPointsLeft} / 2
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8, marginBottom: 4 }}>
+                  {(['str', 'dex', 'con', 'int', 'wis', 'cha'] as const).map(stat => {
+                    const cur = c[stat] as number
+                    const delta = asiDeltas[stat] ?? 0
+                    const atMax = cur + delta >= 20
+                    return (
+                      <div key={stat} style={{ background: 'var(--white)', border: '1px solid var(--border)', padding: '10px 6px', textAlign: 'center', borderRadius: 3 }}>
+                        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 4 }}>{AB_LABEL[stat]}</div>
+                        <div style={{ fontSize: 17, fontWeight: 700, color: delta > 0 ? 'var(--teal2)' : 'var(--text)' }}>{cur + delta}{delta > 0 ? ` (+${delta})` : ''}</div>
+                        <div style={{ display: 'flex', gap: 4, justifyContent: 'center', marginTop: 6 }}>
+                          <button onClick={() => { if (delta > 0) setAsiDeltas({ ...asiDeltas, [stat]: delta - 1 }) }} style={{ width: 24, height: 24, border: '1px solid var(--border2)', background: 'var(--bg)', cursor: 'pointer', fontSize: 14, borderRadius: 2, fontFamily: 'inherit', padding: 0 }}>-</button>
+                          <button onClick={() => { if (!atMax && asiPointsLeft > 0) setAsiDeltas({ ...asiDeltas, [stat]: delta + 1 }) }} style={{ width: 24, height: 24, border: '1px solid var(--border2)', background: 'var(--bg)', cursor: 'pointer', fontSize: 14, borderRadius: 2, fontFamily: 'inherit', padding: 0 }}>+</button>
+                        </div>
+                        {atMax && <div style={{ fontSize: 10, color: 'var(--gold)', fontWeight: 700, marginTop: 2 }}>MAX</div>}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            ) : (
+              <div>
+                <div style={{ fontSize: 13, color: 'var(--text3)', marginBottom: 8 }}>Name the feat you are taking. It is noted on your character but not mechanically enforced.</div>
+                <input
+                  type="text"
+                  value={featName}
+                  onChange={e => setFeatName(e.target.value)}
+                  placeholder="e.g. War Caster, Sentinel, Sharpshooter"
+                  style={{ display: 'block', width: '100%', border: '1px solid var(--border2)', padding: '8px 10px', fontSize: 14, fontFamily: 'inherit', borderRadius: 3, outline: 'none', color: 'var(--text)', background: 'var(--white)', boxSizing: 'border-box' }}
+                />
+              </div>
+            )}
+            <button
+              onClick={() => setPhase('hp')}
+              disabled={asiMode === 'points' && asiPointsLeft > 0}
+              style={{ ...btnBase, background: 'var(--teal)', color: '#fff', opacity: (asiMode === 'points' && asiPointsLeft > 0) ? 0.5 : 1, cursor: (asiMode === 'points' && asiPointsLeft > 0) ? 'not-allowed' : 'pointer' }}
+            >
+              {asiMode === 'points' ? (asiPointsLeft === 0 ? 'Confirm Improvement' : `Distribute ${asiPointsLeft} more point${asiPointsLeft > 1 ? 's' : ''}`) : 'Take Feat'}
+            </button>
+          </div>
+        )}
+
+        {phase === 'hp' && (
           <>
             {newFeatures.length > 0 && (
               <div style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 6 }}>New Features at Level {newLevel}</div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 6 }}>New Features at Level {levelingClassNewLevel}</div>
                 {newFeatures.map(f => (
-                  <div key={f} style={{ padding: '6px 10px', background: '#f8fffe', border: '1px solid var(--border)', borderRadius: 3, marginBottom: 4, fontSize: 13 }}>★ {f}</div>
+                  <div key={f} style={{ padding: '6px 10px', background: '#f8fffe', border: '1px solid var(--border)', borderRadius: 3, marginBottom: 4, fontSize: 13 }}>* {f}</div>
                 ))}
               </div>
             )}
-
             <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 8 }}>HP Gain (d{hd} + CON {conMod >= 0 ? '+' : ''}{conMod})</div>
             <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
               {(['avg', 'roll', 'manual'] as const).map(m => (
@@ -137,26 +340,18 @@ function LevelUpModal({ character: c, onClose }: { character: Character; onClose
                 </button>
               ))}
             </div>
-
             {hpMode === 'manual' && (
               <input type="number" value={manualHp} onChange={e => setManualHp(e.target.value)} placeholder="HP from die roll" min={1} max={hd} style={{ display: 'block', width: '100%', border: '1px solid var(--border2)', padding: '8px 10px', fontSize: 15, fontFamily: 'inherit', borderRadius: 3, outline: 'none', marginBottom: 12, color: 'var(--text)', background: 'var(--white)', boxSizing: 'border-box' }} />
             )}
-
             <div style={{ padding: '10px 12px', background: 'var(--teal-light)', border: '1px solid var(--teal)', borderRadius: 4, marginBottom: 16, fontSize: 14, color: 'var(--teal2)', fontWeight: 500 }}>
-              HP gain: +{Math.max(1, getHpGain())} → new max {c.max_hp + Math.max(1, getHpGain())}
+              HP gain: +{Math.max(1, getHpGain())} -&gt; new max {c.max_hp + Math.max(1, getHpGain())}
             </div>
-
-            {newSlots && (
-              <div style={{ padding: '8px 12px', background: '#f3f0ff', border: '1px solid var(--purple)', borderRadius: 4, marginBottom: 16, fontSize: 13, color: 'var(--purple)' }}>
-                Spell slots will reset for level {newLevel}.
-              </div>
-            )}
-
-            <button onClick={doLevelUp} style={{ display: 'block', width: '100%', padding: 13, background: 'var(--teal)', color: '#fff', border: 'none', fontSize: 15, fontWeight: 700, cursor: 'pointer', borderRadius: 4, fontFamily: 'inherit' }}>
-              Level Up to {newLevel}!
+            <button onClick={doLevelUp} style={{ ...btnBase, background: 'var(--teal)', color: '#fff' }}>
+              Level Up to {c.level + 1}!
             </button>
           </>
         )}
+
       </div>
     </div>
   )
@@ -212,7 +407,7 @@ function AboutTab({ character: c }: { character: Character }) {
       {/* Class features */}
       {classData?.features && (
         <div style={{ marginBottom: 1 }}>
-          <div style={{ padding: '7px 14px', background: '#fafafa', fontSize: 11, fontWeight: 600, color: 'var(--purple)', textTransform: 'uppercase', letterSpacing: '.5px', borderBottom: '1px solid var(--border)' }}>{c.class} Features</div>
+          <div style={{ padding: '7px 14px', background: '#fafafa', fontSize: 11, fontWeight: 600, color: 'var(--purple)', textTransform: 'uppercase', letterSpacing: '.5px', borderBottom: '1px solid var(--border)' }}>{c.subclass ? `${c.class} - ${c.subclass}` : c.class} Features</div>
           {classData.features.map(f => (
             <div key={f.name} onClick={() => setPopup({ title: f.name, desc: f.desc })} style={{ display: 'flex', alignItems: 'center', padding: '10px 14px', borderBottom: '1px solid var(--border)', cursor: 'pointer', background: 'var(--white)' }}
               onMouseEnter={e => (e.currentTarget.style.background = '#fafafa')}

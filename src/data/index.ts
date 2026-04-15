@@ -1,5 +1,6 @@
 export * from './races'
 export * from './classes'
+export * from './subclasses'
 export * from './backgrounds'
 export * from './skills'
 export * from './armor'

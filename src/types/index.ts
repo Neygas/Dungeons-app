@@ -85,7 +85,10 @@ export interface Character {
   // Identity
   name: string
   race: string
+  subrace?: string
   class: string
+  subclass?: string
+  classes?: { name: string; level: number }[]
   level: number
   background: string
   alignment: string
@@ -255,7 +258,9 @@ export interface CombatLogEntry {
 export interface WizardState {
   name: string
   race: string
+  subrace: string
   class: string
+  subclass: string
   level: number
   hpMode: 'max' | 'avg' | 'roll'
   system: 'custom' | 'pointbuy' | 'standard'
