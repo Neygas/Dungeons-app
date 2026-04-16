@@ -7,6 +7,7 @@
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 *{box-sizing:border-box;margin:0;padding:0}
+input,select,textarea{font-size:16px}
 :root{
   --teal:#3a9e8e;--teal2:#2d8070;--teal-light:#e8f5f3;
   --purple:#7c3aed;--purple-light:#ede9fe;
@@ -32,7 +33,7 @@ body{font-family:'Inter',system-ui,sans-serif;font-size:15px;color:var(--text);b
 .land-card p{font-size:13px;color:var(--text3)}
 .f{margin-bottom:16px}
 .f label{display:block;font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px}
-.f input,.f select,.f textarea{width:100%;border:none;border-bottom:1px solid var(--border2);background:transparent;padding:7px 4px;font-size:15px;color:var(--text);outline:none;font-family:inherit}
+.f input,.f select,.f textarea{width:100%;border:none;border-bottom:1px solid var(--border2);background:transparent;padding:7px 4px;font-size:16px;color:var(--text);outline:none;font-family:inherit}
 .f input:focus,.f select:focus,.f textarea:focus{border-bottom-color:var(--teal)}
 .f textarea{resize:vertical;min-height:60px;border:1px solid var(--border2);padding:8px;border-radius:2px}
 .f textarea:focus{border-color:var(--teal)}
@@ -67,7 +68,7 @@ select option{background:#fff;color:var(--text)}
 .hp-track{background:#eee;height:8px;border-radius:4px}
 .hp-fill{height:8px;border-radius:4px;transition:width .4s,background .4s}
 .hp-adj{display:flex;gap:8px;align-items:center;margin-top:10px}
-.hp-adj input{width:60px;text-align:center;border:1px solid var(--border2);padding:6px;font-size:15px;font-family:inherit;border-radius:2px;background:var(--white);color:var(--text);outline:none}
+.hp-adj input{width:60px;text-align:center;border:1px solid var(--border2);padding:6px;font-size:16px;font-family:inherit;border-radius:2px;background:var(--white);color:var(--text);outline:none}
 .hp-adj input:focus{border-color:var(--teal)}
 .stat-grid{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid var(--border);border-top:none;background:var(--white)}
 .stat-cell{border-right:1px solid var(--border);border-bottom:1px solid var(--border);padding:10px 6px;text-align:center}
@@ -88,7 +89,7 @@ select option{background:#fff;color:var(--text)}
 .ab-lbl{font-size:9px;color:var(--text3);font-weight:600;letter-spacing:.3px;margin-top:1px}
 .ab-edit-row{background:var(--white);border:1px solid var(--border);border-top:none;padding:10px 14px;display:none;align-items:center;gap:10px}
 .ab-edit-row.show{display:flex}
-.ab-edit-row input{width:56px;border:1px solid var(--border2);padding:5px;font-size:15px;text-align:center;font-family:inherit;color:var(--text);border-radius:2px;background:var(--white);outline:none}
+.ab-edit-row input{width:56px;border:1px solid var(--border2);padding:5px;font-size:16px;text-align:center;font-family:inherit;color:var(--text);border-radius:2px;background:var(--white);outline:none}
 .ab-edit-row input:focus{border-color:var(--teal)}
 .tbl-wrap{background:var(--white);border:1px solid var(--border);border-top:none}
 .tbl-row{display:flex;align-items:center;padding:8px 14px;border-bottom:1px solid var(--border);gap:10px}
@@ -108,7 +109,7 @@ select option{background:#fff;color:var(--text)}
 .grp-hdr{padding:6px 14px;background:#fafafa;border-bottom:1px solid var(--border);font-size:11px;font-weight:600;color:var(--teal2);letter-spacing:.5px;text-transform:uppercase}
 .prof-check{width:15px;height:15px;accent-color:var(--purple);cursor:pointer;flex-shrink:0}
 .exp-check{width:15px;height:15px;accent-color:var(--gold);cursor:pointer;flex-shrink:0}
-.ov-input{width:40px;border:none;border-bottom:1px solid var(--border2);padding:2px 3px;font-size:13px;text-align:center;font-family:inherit;color:var(--purple);background:transparent;outline:none}
+.ov-input{width:48px;border:none;border-bottom:1px solid var(--border2);padding:2px 3px;font-size:16px;text-align:center;font-family:inherit;color:var(--purple);background:transparent;outline:none}
 .ov-input:focus{border-bottom-color:var(--purple)}
 .reset-btn{font-size:10px;color:var(--text3);cursor:pointer;padding:1px 5px;border:1px solid var(--border);border-radius:2px;background:var(--white);font-family:inherit}
 .reset-btn:hover{border-color:var(--purple);color:var(--purple)}
@@ -154,7 +155,7 @@ select option{background:#fff;color:var(--text)}
 .cond-btn.on{background:#fde8e8;color:var(--red);border-color:var(--red);font-weight:500}
 .temp-row{display:flex;align-items:center;gap:10px;padding:12px 14px;border-top:1px solid var(--border)}
 .temp-row label{font-size:12px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;min-width:76px}
-.temp-input{width:70px;border:1px solid var(--border2);padding:6px;font-size:15px;font-family:inherit;text-align:center;color:var(--text);border-radius:2px;background:var(--white);outline:none}
+.temp-input{width:70px;border:1px solid var(--border2);padding:6px;font-size:16px;font-family:inherit;text-align:center;color:var(--text);border-radius:2px;background:var(--white);outline:none}
 .temp-input:focus{border-color:var(--teal)}
 .spell-slot-grid{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid var(--border);border-top:none;background:var(--white)}
 .slot-cell{border-right:1px solid var(--border);border-bottom:1px solid var(--border);padding:10px 6px;text-align:center}
@@ -255,7 +256,7 @@ select option{background:#fff;color:var(--text)}
 .chk-lim span{color:var(--purple);font-weight:600}
 .pers-f{margin-bottom:12px}
 .pers-f label{font-size:11px;font-weight:600;color:var(--text3);letter-spacing:.5px;display:block;margin-bottom:4px;text-transform:uppercase}
-.pers-f textarea{width:100%;border:1px solid var(--border);padding:8px;font-size:14px;color:var(--text);font-family:inherit;resize:vertical;min-height:52px;outline:none;border-radius:2px}
+.pers-f textarea{width:100%;border:1px solid var(--border);padding:8px;font-size:16px;color:var(--text);font-family:inherit;resize:vertical;min-height:52px;outline:none;border-radius:2px}
 .pers-f textarea:focus{border-color:var(--teal)}
 .rev-sec{margin-bottom:16px}
 .rev-sec h3{font-size:11px;font-weight:600;color:var(--teal2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;padding-bottom:5px;border-bottom:1px solid var(--border)}
@@ -298,7 +299,7 @@ select option{background:#fff;color:var(--text)}
 .custom-form-section{padding:14px 16px;border-top:2px solid var(--border);flex-shrink:0;background:var(--white)}
 .custom-form-title{font-size:12px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px}
 .custom-inputs-row{display:flex;gap:8px;flex-wrap:wrap}
-.custom-inputs-row input,.custom-inputs-row select{border:1px solid var(--border2);padding:8px 10px;font-size:14px;font-family:inherit;border-radius:4px;background:var(--white);color:var(--text);outline:none}
+.custom-inputs-row input,.custom-inputs-row select{border:1px solid var(--border2);padding:8px 10px;font-size:16px;font-family:inherit;border-radius:4px;background:var(--white);color:var(--text);outline:none}
 .custom-inputs-row input:focus,.custom-inputs-row select:focus{border-color:var(--teal)}
 .custom-add-btn{padding:8px 16px;background:var(--teal);color:#fff;border:none;border-radius:4px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap}
 .custom-add-btn:hover{background:var(--teal2)}
@@ -426,7 +427,7 @@ select option{background:#fff;color:var(--text)}
 .dice-controls{padding:0 12px 10px;display:flex;align-items:center;gap:8px}
 .dice-count-btn{width:26px;height:26px;border:1px solid var(--border2);background:var(--white);border-radius:4px;cursor:pointer;font-size:15px;font-weight:600;color:var(--text2);display:flex;align-items:center;justify-content:center;font-family:inherit}
 .dice-count-btn:hover{border-color:var(--teal);color:var(--teal)}
-.dice-mod-input{width:44px;border:1px solid var(--border2);padding:4px 6px;font-size:13px;text-align:center;font-family:inherit;border-radius:4px;background:var(--white);color:var(--text);outline:none}
+.dice-mod-input{width:50px;border:1px solid var(--border2);padding:4px 6px;font-size:16px;text-align:center;font-family:inherit;border-radius:4px;background:var(--white);color:var(--text);outline:none}
 .dice-mod-input:focus{border-color:var(--teal)}
 .dice-result{padding:10px 14px;border-top:1px solid var(--border);text-align:center;min-height:54px}
 .dice-result-total{font-size:32px;font-weight:700;color:var(--purple)}
@@ -1579,7 +1580,7 @@ function rSheet(){
     +'<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text3);margin-bottom:20px"><span>Level '+lvl+'</span><span>Level '+(lvl+1)+' - '+nextXP.toLocaleString()+' XP</span></div>'
     +milestones
     +'<div style="border-top:1px solid var(--border);padding-top:16px;margin-top:16px">'
-    +'<div style="display:flex;gap:8px;margin-bottom:10px"><input id="exp-add-input" type="number" placeholder="XP amount" style="flex:1;border:1px solid var(--border2);padding:10px 12px;font-size:15px;font-family:inherit;border-radius:4px;background:var(--white);color:var(--text);outline:none"><button onclick="addExp()" style="padding:10px 18px;background:var(--purple);color:#fff;border:none;border-radius:4px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">+ Add XP</button></div>'
+    +'<div style="display:flex;gap:8px;margin-bottom:10px"><input id="exp-add-input" type="number" placeholder="XP amount" style="flex:1;border:1px solid var(--border2);padding:10px 12px;font-size:16px;font-family:inherit;border-radius:4px;background:var(--white);color:var(--text);outline:none"><button onclick="addExp()" style="padding:10px 18px;background:var(--purple);color:#fff;border:none;border-radius:4px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">+ Add XP</button></div>'
     +'<button onclick="doLevelUp()" '+(canLvl?'':'disabled')+' style="width:100%;padding:13px;background:'+(canLvl?'linear-gradient(90deg,var(--purple),#a855f7)':'var(--border)')+';color:'+(canLvl?'#fff':'var(--text3)')+';border:none;border-radius:6px;font-size:16px;font-weight:700;cursor:'+(canLvl?'pointer':'not-allowed')+';font-family:inherit">'+(canLvl?'Level Up to '+(lvl+1)+'!':lvl>=20?'Max Level':'Need '+(nextXP-exp).toLocaleString()+' more XP')+'</button>'
     +'</div></div></div></div>'
     +'<div style="'+(S.activeInfoTab===2?SVis:SHid)+'" onclick="if(event.target===this)closeInfoSheet()">'
@@ -1823,7 +1824,7 @@ function rSheet(){
     +'<button class="btn-dots" onclick="openDotsMenu(event)">&#8943;</button>'
     +'</div>'
     +'<div style="height:8px;background:#eee;border-radius:4px;overflow:hidden;margin-bottom:10px"><div style="height:8px;background:'+hpCol2+';border-radius:4px;width:'+Math.round(pct*100)+'%"></div></div>'
-    +'<div style="display:flex;gap:8px;align-items:center"><button class="btn-icon minus" onclick="adjHP(-1)">-</button><input id="hp-amt" type="number" value="1" min="0" style="width:60px;text-align:center;border:1px solid var(--border2);padding:7px;font-size:15px;font-family:inherit;border-radius:4px;background:var(--white);color:var(--text);outline:none"><button class="btn-icon" onclick="adjHP(1)">+</button><span style="flex:1;text-align:right;font-size:12px;color:var(--text3)">damage / healing</span></div>'
+    +'<div style="display:flex;gap:8px;align-items:center"><button class="btn-icon minus" onclick="adjHP(-1)">-</button><input id="hp-amt" type="number" value="1" min="0" style="width:60px;text-align:center;border:1px solid var(--border2);padding:7px;font-size:16px;font-family:inherit;border-radius:4px;background:var(--white);color:var(--text);outline:none"><button class="btn-icon" onclick="adjHP(1)">+</button><span style="flex:1;text-align:right;font-size:12px;color:var(--text3)">damage / healing</span></div>'
     +activeConds
     +deathSaves
     +'</div>'
@@ -1922,7 +1923,7 @@ function rSheet(){
     // GEAR ANCHOR
     +'<div id="gear-anchor" style="height:1px"></div>'
     +'<div class="scroll-section"><div class="scroll-section-title">Inventory</div>'+gearHtml
-    +'<div style="display:flex;gap:8px;margin-top:10px"><input id="inv-name" placeholder="Item name" style="flex:1;border:1px solid var(--border2);padding:7px;font-size:14px;font-family:inherit;border-radius:2px;background:var(--white);color:var(--text);outline:none"><input id="inv-qty" type="number" value="1" min="1" style="width:50px;border:1px solid var(--border2);padding:7px;font-size:14px;font-family:inherit;border-radius:2px;background:var(--white);color:var(--text);text-align:center;outline:none"><button class="btn btn-sm btn-primary" onclick="addInv()">Add</button></div>'
+    +'<div style="display:flex;gap:8px;margin-top:10px"><input id="inv-name" placeholder="Item name" style="flex:1;border:1px solid var(--border2);padding:7px;font-size:16px;font-family:inherit;border-radius:2px;background:var(--white);color:var(--text);outline:none"><input id="inv-qty" type="number" value="1" min="1" style="width:54px;border:1px solid var(--border2);padding:7px;font-size:16px;font-family:inherit;border-radius:2px;background:var(--white);color:var(--text);text-align:center;outline:none"><button class="btn btn-sm btn-primary" onclick="addInv()">Add</button></div>'
     +'</div>'
     +'<div class="scroll-section"><div class="scroll-section-title">Currency</div>'+currencyHtml+'</div>'
     +'<div style="height:80px"></div>'
@@ -1933,7 +1934,7 @@ function abBar(c){return '<div class="ab-bar">'+ABKEYS.map(ab=>'<div class="ab-c
 function promptPhotoUrl(){
   const c=S.myChar;
   const current=c.photoUrl||'';
-  openModal('Character Photo','Enter an image URL','<div class="modal-effect" style="margin-bottom:12px">Paste a direct link to a photo (JPG, PNG). Works with links from Google Photos, Imgur, or any direct image URL.</div>'+(current?'<div style="text-align:center;margin-bottom:12px"><img src="'+current+'" style="width:80px;height:80px;border-radius:50%;object-fit:cover;border:2px solid var(--teal)"></div>':'')+'<input id="photo-url-input" type="url" placeholder="https://..." value="'+current+'" style="width:100%;border:1px solid var(--border2);padding:10px;font-size:14px;font-family:inherit;border-radius:4px;outline:none">'+(current?'<button onclick="S.myChar.photoUrl=\'\';closeModal();render()" style="width:100%;padding:8px;margin-top:8px;background:none;border:1px solid var(--border2);border-radius:4px;font-size:13px;color:var(--text3);cursor:pointer;font-family:inherit">Remove photo</button>':''),'Save Photo',()=>{const val=(document.getElementById('photo-url-input')&&document.getElementById('photo-url-input').value||'').trim();S.myChar.photoUrl=val;toast(val?'Photo saved!':'Photo removed');});
+  openModal('Character Photo','Enter an image URL','<div class="modal-effect" style="margin-bottom:12px">Paste a direct link to a photo (JPG, PNG). Works with links from Google Photos, Imgur, or any direct image URL.</div>'+(current?'<div style="text-align:center;margin-bottom:12px"><img src="'+current+'" style="width:80px;height:80px;border-radius:50%;object-fit:cover;border:2px solid var(--teal)"></div>':'')+'<input id="photo-url-input" type="url" placeholder="https://..." value="'+current+'" style="width:100%;border:1px solid var(--border2);padding:10px;font-size:16px;font-family:inherit;border-radius:4px;outline:none">'+(current?'<button onclick="S.myChar.photoUrl=\'\';closeModal();render()" style="width:100%;padding:8px;margin-top:8px;background:none;border:1px solid var(--border2);border-radius:4px;font-size:13px;color:var(--text3);cursor:pointer;font-family:inherit">Remove photo</button>':''),'Save Photo',()=>{const val=(document.getElementById('photo-url-input')&&document.getElementById('photo-url-input').value||'').trim();S.myChar.photoUrl=val;toast(val?'Photo saved!':'Photo removed');});
 }
 function openAbEditBtn(el){openAbEdit(el.getAttribute('data-ab'));}
 function openAbEdit(ab){S.activeAbEdit=S.activeAbEdit===ab?null:ab;render();}
@@ -1978,8 +1979,8 @@ function sheetGear(c){
     +'</div></div></div>'
     +'<div id="custom-gear-form" style="display:none;background:var(--white);border:1px solid var(--border);border-top:none;padding:12px 14px">'
     +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">'
-    +'<input id="inv-name" placeholder="Item name" style="flex:2;min-width:120px;border:1px solid var(--border2);padding:7px;font-size:14px;font-family:inherit;border-radius:2px;background:var(--white);color:var(--text);outline:none">'
-    +'<input id="inv-qty" type="number" value="1" min="1" style="width:54px;border:1px solid var(--border2);padding:7px;font-size:14px;font-family:inherit;border-radius:2px;background:var(--white);color:var(--text);text-align:center;outline:none">'
+    +'<input id="inv-name" placeholder="Item name" style="flex:2;min-width:120px;border:1px solid var(--border2);padding:7px;font-size:16px;font-family:inherit;border-radius:2px;background:var(--white);color:var(--text);outline:none">'
+    +'<input id="inv-qty" type="number" value="1" min="1" style="width:54px;border:1px solid var(--border2);padding:7px;font-size:16px;font-family:inherit;border-radius:2px;background:var(--white);color:var(--text);text-align:center;outline:none">'
     +'</div>'
     +'<button class="btn btn-sm btn-primary" onclick="addInv()" style="margin:0">Add Item</button>'
     +'</div>';
