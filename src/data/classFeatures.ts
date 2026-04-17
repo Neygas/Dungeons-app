@@ -252,16 +252,31 @@ export const ACTIVE_CLASS_FEATURES: ActiveClassFeature[] = [
 ]
 
 export function getFeaturesForCharacter(c: Character): ActiveClassFeature[] {
+  // Build a map of class name → level from multiclass array, falling back to primary class
+  const classLevels: Record<string, number> = {}
+  if (c.classes && c.classes.length > 0) {
+    for (const cl of c.classes) classLevels[cl.name] = cl.level
+  } else {
+    classLevels[c.class] = c.level
+  }
+
   return ACTIVE_CLASS_FEATURES.filter(f => {
-    if (f.cls !== c.class) return false
-    if (f.minLevel > c.level) return false
-    if (f.sub && f.sub !== c.subclass) return false
+    const classLevel = classLevels[f.cls]
+    if (classLevel === undefined) return false
+    if (f.minLevel > classLevel) return false
+    // Subclass check: only enforce if the feature's class matches the primary class
+    if (f.sub && f.cls === c.class && f.sub !== c.subclass) return false
     return true
   })
 }
 
 export function featMaxUses(f: ActiveClassFeature, c: Character): number {
   if (f.maxUses === null) return 0
-  if (typeof f.maxUses === 'function') return f.maxUses(c)
+  if (typeof f.maxUses === 'function') {
+    // For multiclass characters, pass a proxy with the correct class level
+    const classLevel = c.classes?.find(cl => cl.name === f.cls)?.level ?? c.level
+    const proxy = classLevel !== c.level ? { ...c, level: classLevel } : c
+    return f.maxUses(proxy)
+  }
   return f.maxUses
 }
