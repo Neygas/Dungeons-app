@@ -8,7 +8,7 @@ import { useLongPress } from '@/lib/useLongPress'
 
 interface Props { character: Character }
 
-function SkillCell({ skill, c, editMode, onToggle }: { skill: { name: string; ab: string }; c: Character; editMode: boolean; onToggle: (name: string) => void }) {
+function SkillCell({ skill, c, onToggle }: { skill: { name: string; ab: string }; c: Character; onToggle: (name: string) => void }) {
   const isProf = c.skill_proficiencies.includes(skill.name)
   const isExpert = c.skill_expertise.includes(skill.name)
   const bonus = skillBonus(c, skill.name, skill.ab)
@@ -34,7 +34,7 @@ function SkillCell({ skill, c, editMode, onToggle }: { skill: { name: string; ab
 
 export default function SkillsSection({ character: c }: Props) {
   const { patchActiveCharacter } = useCharacterStore()
-  const { editMode, setEditMode } = useUIStore()
+  const { setEditMode } = useUIStore()
   const [sortAlpha, setSortAlpha] = useState(false)
 
   const toggleProf = async (name: string) => {
@@ -95,7 +95,7 @@ export default function SkillsSection({ character: c }: Props) {
             )
           }
           return (
-            <SkillCell key={item.skill.name + idx} skill={item.skill} c={c} editMode={editMode} onToggle={toggleProf} />
+            <SkillCell key={item.skill.name + idx} skill={item.skill} c={c} onToggle={toggleProf} />
           )
         })}
       </div>
