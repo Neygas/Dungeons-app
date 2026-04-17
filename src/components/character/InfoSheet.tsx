@@ -95,7 +95,11 @@ function LevelUpModal({ character: c, onClose }: { character: Character; onClose
   const needsSubclass = !c.subclass && levelingClassNewLevel === (SUBCLASS_LEVEL[levelingClass] ?? -1)
   const hasASI = !isNewMulticlass && newFeatures.includes('Ability Score Improvement')
 
-  const availableNewClasses = CLASS_NAMES.filter(cn => !existingClasses.some(cl => cl.name === cn))
+  const availableNewClasses = CLASS_NAMES.filter(cn => {
+    if (existingClasses.some(cl => cl.name === cn)) return false
+    const reqs = MULTICLASS_PREREQS[cn] ?? []
+    return reqs.every(p => (c[p.ability as keyof Character] as number) >= p.score)
+  })
   const prereqs = MULTICLASS_PREREQS[newClassInput] ?? []
   const prereqsMet = prereqs.every(p => (c[p.ability as keyof Character] as number) >= p.score)
 
