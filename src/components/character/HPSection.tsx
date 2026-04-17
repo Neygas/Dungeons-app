@@ -3,15 +3,33 @@ import type { Character } from '@/types'
 import { hpColor } from '@/lib/calculations'
 import { useCharacterStore } from '@/store/characterStore'
 import { useUIStore } from '@/store/uiStore'
+import { useLongPress } from '@/lib/useLongPress'
 import { CONDITIONS } from '@/data'
 
 interface Props { character: Character }
 
 export default function HPSection({ character: c }: Props) {
   const { patchActiveCharacter } = useCharacterStore()
-  const { showToast, openSheet } = useUIStore()
+  const { showToast, openSheet, setEditMode } = useUIStore()
   const [adjVal, setAdjVal] = useState('')
   const [showMenu, setShowMenu] = useState(false)
+  const [editingMaxHp, setEditingMaxHp] = useState(false)
+  const [maxHpVal, setMaxHpVal] = useState('')
+
+  const startEditMaxHp = () => {
+    setEditMode(true)
+    setEditingMaxHp(true)
+    setMaxHpVal(String(c.max_hp))
+  }
+
+  const commitMaxHp = async () => {
+    const n = Math.max(1, parseInt(maxHpVal) || 1)
+    await patchActiveCharacter({ max_hp: n, hp: Math.min(c.hp, n) })
+    showToast(`Max HP set to ${n}`)
+    setEditingMaxHp(false)
+  }
+
+  const maxHpLp = useLongPress(startEditMaxHp)
 
   const pct = c.max_hp > 0 ? Math.max(0, c.hp) / c.max_hp : 0
   const color = hpColor(pct)
@@ -68,7 +86,17 @@ export default function HPSection({ character: c }: Props) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <span style={{ fontSize: 22, fontWeight: 700, color }}>
               {c.hp}
-              <span style={{ fontSize: 14, fontWeight: 400, color: 'var(--text3)' }}> / {c.max_hp}</span>
+              {editingMaxHp ? (
+                <input
+                  autoFocus type="number" value={maxHpVal}
+                  onChange={e => setMaxHpVal(e.target.value)}
+                  onBlur={commitMaxHp}
+                  onKeyDown={e => { if (e.key === 'Enter') commitMaxHp(); if (e.key === 'Escape') setEditingMaxHp(false) }}
+                  style={{ width: 48, border: 'none', borderBottom: '1px solid var(--border2)', background: 'transparent', fontSize: 14, fontWeight: 400, textAlign: 'center', color: 'var(--text)', outline: 'none', fontFamily: 'inherit', display: 'inline-block', padding: 0 }}
+                />
+              ) : (
+                <span {...maxHpLp} style={{ fontSize: 14, fontWeight: 400, color: 'var(--text3)', cursor: 'pointer', userSelect: 'none' }}> / {c.max_hp}</span>
+              )}
               {(c.temp_hp ?? 0) > 0 && <span style={{ fontSize: 13, color: 'var(--teal)', marginLeft: 6 }}>+{c.temp_hp} temp</span>}
             </span>
             {/* ... menu button */}

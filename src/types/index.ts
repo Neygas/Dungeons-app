@@ -157,6 +157,7 @@ export interface Character {
   // Class features
   feature_uses: Record<string, number>
   features_active: Record<string, boolean>
+  stat_overrides?: Record<string, number>
 
   // Bio
   personality: string

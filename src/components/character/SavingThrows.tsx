@@ -7,14 +7,15 @@ import { useLongPress } from '@/lib/useLongPress'
 
 interface Props { character: Character }
 
-function SaveCell({ abKey, c, editMode }: { abKey: string; c: Character; editMode: boolean }) {
+function SaveCell({ abKey, c }: { abKey: string; c: Character }) {
   const { patchActiveCharacter } = useCharacterStore()
+  const { setEditMode } = useUIStore()
   const upper = abKey.toUpperCase()
   const isProf = c.save_proficiencies.includes(upper)
   const bonus = saveBonus(c, abKey)
 
   const toggleProf = async () => {
-    if (!editMode) return
+    setEditMode(true)
     const next = isProf
       ? c.save_proficiencies.filter(s => s !== upper)
       : [...c.save_proficiencies, upper]
@@ -29,7 +30,7 @@ function SaveCell({ abKey, c, editMode }: { abKey: string; c: Character; editMod
       style={{
         padding: '10px 4px',
         textAlign: 'center',
-        cursor: editMode ? 'pointer' : 'default',
+        cursor: 'pointer',
         background: isProf ? 'var(--purple-light)' : undefined,
         userSelect: 'none',
       }}
@@ -58,7 +59,7 @@ export default function SavingThrows({ character: c }: Props) {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', border: '1px solid var(--border)', borderTop: 'none', background: 'var(--white)' }}>
         {AB_KEYS.map((key, i) => (
           <div key={key} style={{ borderRight: i < 5 ? '1px solid var(--border)' : 'none' }}>
-            <SaveCell abKey={key} c={c} editMode={editMode} />
+            <SaveCell abKey={key} c={c} />
           </div>
         ))}
       </div>

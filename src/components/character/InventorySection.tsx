@@ -5,6 +5,46 @@ import { useCharacterStore } from '@/store/characterStore'
 import { useUIStore } from '@/store/uiStore'
 import { useSessionStore } from '@/store/sessionStore'
 import AddModal from '@/components/shared/AddModal'
+import { useLongPress } from '@/lib/useLongPress'
+
+function CurrencyCell({ field, value, onCommit }: { field: string; value: number; onCommit: (val: string) => void }) {
+  const [editing, setEditing] = useState(false)
+  const [val, setVal] = useState('')
+  const { setEditMode } = useUIStore()
+
+  const startEdit = () => {
+    setEditMode(true)
+    setEditing(true)
+    setVal(String(value))
+  }
+  const commit = () => {
+    onCommit(val)
+    setEditing(false)
+  }
+  const lp = useLongPress(startEdit)
+
+  return (
+    <div
+      {...lp}
+      style={{ padding: '10px 6px', textAlign: 'center', cursor: 'pointer', background: editing ? 'var(--teal-light)' : undefined, outline: editing ? '2px solid var(--teal)' : undefined, outlineOffset: -1, userSelect: 'none' }}
+      onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--teal-light)'}
+      onMouseLeave={e => { if (!editing) (e.currentTarget as HTMLElement).style.background = '' }}
+    >
+      {editing ? (
+        <input
+          autoFocus type="number" min="0" value={val}
+          onChange={e => setVal(e.target.value)}
+          onBlur={commit}
+          onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') setEditing(false) }}
+          style={{ width: '100%', border: 'none', borderBottom: '1px solid var(--border2)', background: 'transparent', fontSize: 18, fontWeight: 700, textAlign: 'center', color: 'var(--text)', outline: 'none', fontFamily: 'inherit', padding: 0 }}
+        />
+      ) : (
+        <div style={{ fontSize: 18, fontWeight: 700 }}>{value}</div>
+      )}
+      <div style={{ fontSize: 10, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.5px', marginTop: 2 }}>{field}</div>
+    </div>
+  )
+}
 
 interface Props { character: Character }
 
@@ -178,20 +218,8 @@ export default function InventorySection({ character: c }: Props) {
         </div>
         <div style={{ display: 'flex' }}>
           {(['pp', 'gp', 'ep', 'sp', 'cp'] as const).map((field, i) => (
-            <div key={field} style={{ flex: 1, borderRight: i < 4 ? '1px solid var(--border)' : 'none', padding: '10px 6px', textAlign: 'center' }}>
-              {editMode ? (
-                <input
-                  type="number"
-                  min="0"
-                  defaultValue={c[field]}
-                  onBlur={e => setCurrency(field, e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') setCurrency(field, (e.target as HTMLInputElement).value) }}
-                  style={{ width: '100%', border: 'none', borderBottom: '1px solid var(--border2)', background: 'transparent', fontSize: 18, fontWeight: 700, textAlign: 'center', color: 'var(--text)', outline: 'none', fontFamily: 'inherit', padding: 0 }}
-                />
-              ) : (
-                <div style={{ fontSize: 18, fontWeight: 700 }}>{c[field]}</div>
-              )}
-              <div style={{ fontSize: 10, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.5px', marginTop: 2 }}>{field}</div>
+            <div key={field} style={{ flex: 1, borderRight: i < 4 ? '1px solid var(--border)' : 'none' }}>
+              <CurrencyCell field={field} value={c[field]} onCommit={val => setCurrency(field, val)} />
             </div>
           ))}
         </div>

@@ -17,7 +17,7 @@ function SkillCell({ skill, c, editMode, onToggle }: { skill: { name: string; ab
   return (
     <div
       {...lp}
-      style={{ display: 'flex', alignItems: 'center', padding: '7px 10px', borderBottom: '1px solid var(--border)', borderRight: '1px solid var(--border)', gap: 7, cursor: editMode ? 'pointer' : 'default', userSelect: 'none' }}
+      style={{ display: 'flex', alignItems: 'center', padding: '7px 10px', borderBottom: '1px solid var(--border)', borderRight: '1px solid var(--border)', gap: 7, cursor: 'pointer', userSelect: 'none' }}
       onMouseEnter={e => (e.currentTarget.style.background = '#fafafa')}
       onMouseLeave={e => (e.currentTarget.style.background = '')}
     >
@@ -34,11 +34,11 @@ function SkillCell({ skill, c, editMode, onToggle }: { skill: { name: string; ab
 
 export default function SkillsSection({ character: c }: Props) {
   const { patchActiveCharacter } = useCharacterStore()
-  const { editMode } = useUIStore()
+  const { editMode, setEditMode } = useUIStore()
   const [sortAlpha, setSortAlpha] = useState(false)
 
   const toggleProf = async (name: string) => {
-    if (!editMode) return
+    setEditMode(true)
     const hasProf = c.skill_proficiencies.includes(name)
     const hasExpert = c.skill_expertise.includes(name)
     if (!hasProf) {
