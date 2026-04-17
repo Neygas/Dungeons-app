@@ -124,7 +124,6 @@ function PlayerCard({ char, sessionId, isTurn }: { char: Character; sessionId: s
         borderTop: 'none',
         transition: 'border-color .3s',
       }}
-      className={isTurn ? 'your-turn-pulse' : ''}
     >
       {/* Top row */}
       <div style={{ padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 10 }}>

@@ -161,7 +161,7 @@ export default function CharacterSheetScreen() {
   const initials = c.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
 
   return (
-    <div ref={scrollRef} className={isTurn ? 'your-turn-pulse' : ''} style={{ maxWidth: 600, margin: '0 auto', paddingBottom: 80, height: '100vh', overflowY: 'auto', border: isTurn ? '2px solid var(--teal)' : 'none', transition: 'border-color .3s' }}>
+    <div ref={scrollRef} style={{ maxWidth: 600, margin: '0 auto', paddingBottom: 80, height: '100vh', overflowY: 'auto' }}>
       {/* Sticky header */}
       <div style={{ position: 'sticky', top: 0, zIndex: 100, background: 'var(--teal)' }}>
 
