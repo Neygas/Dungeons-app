@@ -252,20 +252,19 @@ export const ACTIVE_CLASS_FEATURES: ActiveClassFeature[] = [
 ]
 
 export function getFeaturesForCharacter(c: Character): ActiveClassFeature[] {
-  // Build a map of class name → level from multiclass array, falling back to primary class
-  const classLevels: Record<string, number> = {}
+  // Build a map of class name → { level, subclass } from multiclass array or primary class
+  const classMap: Record<string, { level: number; subclass?: string }> = {}
   if (c.classes && c.classes.length > 0) {
-    for (const cl of c.classes) classLevels[cl.name] = cl.level
+    for (const cl of c.classes) classMap[cl.name] = { level: cl.level, subclass: cl.subclass }
   } else {
-    classLevels[c.class] = c.level
+    classMap[c.class] = { level: c.level, subclass: c.subclass }
   }
 
   return ACTIVE_CLASS_FEATURES.filter(f => {
-    const classLevel = classLevels[f.cls]
-    if (classLevel === undefined) return false
-    if (f.minLevel > classLevel) return false
-    // Subclass check: only enforce if the feature's class matches the primary class
-    if (f.sub && f.cls === c.class && f.sub !== c.subclass) return false
+    const entry = classMap[f.cls]
+    if (!entry) return false
+    if (f.minLevel > entry.level) return false
+    if (f.sub && f.sub !== entry.subclass) return false
     return true
   })
 }

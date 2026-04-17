@@ -20,6 +20,7 @@ import BottomSheet from '@/components/shared/BottomSheet'
 import Toast from '@/components/shared/Toast'
 import DiceRoller from '@/components/shared/DiceRoller'
 import { CLASSES, XP_TABLE } from '@/data'
+import { getFeaturesForCharacter } from '@/data/classFeatures'
 
 const NAV_TABS = ['Stats', 'Spells', 'Combat', 'Gear', 'Features']
 const SECTION_IDS = ['section-stats', 'section-spells', 'section-combat', 'section-gear', 'section-features']
@@ -59,6 +60,7 @@ export default function CharacterSheetScreen() {
   const scrollRef = useRef<HTMLDivElement>(null)
   const lastScrollY = useRef(0)
   const prevHpRef = useRef<number | null>(null)
+  const prevIsTurnRef = useRef(false)
 
   useEffect(() => {
     if (user && characters.length === 0) fetchCharacters(user.id)
@@ -105,6 +107,20 @@ export default function CharacterSheetScreen() {
     }
     prevHpRef.current = activeCharacter.hp
   }, [activeCharacter?.hp]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-reset round features when it becomes this character's turn
+  useEffect(() => {
+    if (!activeCharacter) return
+    if (isTurn && !prevIsTurnRef.current) {
+      const roundFeatures = getFeaturesForCharacter(activeCharacter).filter(f => f.resetOn === 'round')
+      if (roundFeatures.length > 0) {
+        const newUses = { ...(activeCharacter.feature_uses ?? {}) }
+        for (const f of roundFeatures) newUses[f.key] = 0
+        useCharacterStore.getState().patchActiveCharacter({ feature_uses: newUses })
+      }
+    }
+    prevIsTurnRef.current = isTurn
+  }, [isTurn]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const scrollToSection = (idx: number) => {
     const el = document.getElementById(SECTION_IDS[idx])

@@ -88,7 +88,7 @@ export interface Character {
   subrace?: string
   class: string
   subclass?: string
-  classes?: { name: string; level: number }[]
+  classes?: { name: string; level: number; subclass?: string }[]
   level: number
   background: string
   alignment: string

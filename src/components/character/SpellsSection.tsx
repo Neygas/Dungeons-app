@@ -11,6 +11,7 @@ interface Props { character: Character }
 
 const LEVEL_NAMES = ['Cantrip', '1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th', '9th']
 const SCHOOL_COLORS: Record<string, string> = { Evocation: 'var(--red)', Abjuration: 'var(--teal)', Conjuration: 'var(--purple)', Enchantment: 'var(--gold)', Divination: '#0077aa', Illusion: '#6b21a8', Transmutation: '#15803d', Necromancy: '#374151' }
+const PREPARED_CASTERS = ['Cleric', 'Druid', 'Paladin', 'Artificer', 'Wizard']
 
 export default function SpellsSection({ character: c }: Props) {
   const { patchActiveCharacter } = useCharacterStore()
@@ -19,6 +20,9 @@ export default function SpellsSection({ character: c }: Props) {
   const [showAddModal, setShowAddModal] = useState(false)
   const [dbQuery, setDbQuery] = useState('')
   const [dbFilter, setDbFilter] = useState<number | 'all'>('all')
+  const [preparedOnly, setPreparedOnly] = useState(false)
+
+  const isPreparedCaster = PREPARED_CASTERS.includes(c.class)
 
   const spellAb = CLASSES[c.class]?.spellcasting
   if (!spellAb && !c.spells?.length) return null
@@ -76,9 +80,20 @@ export default function SpellsSection({ character: c }: Props) {
     showToast('Concentration ended')
   }
 
-  // Group spells by level
+  const togglePrepared = async (spellName: string) => {
+    const updated = (c.spells ?? []).map(s =>
+      s.name === spellName ? { ...s, prepared: !s.prepared } : s
+    )
+    await patchActiveCharacter({ spells: updated })
+  }
+
+  // Group spells by level (filter by prepared for prepared casters)
+  const visibleSpells = (c.spells ?? []).filter(s =>
+    !isPreparedCaster || s.level === 0 || !preparedOnly || s.prepared
+  )
+  const preparedCount = isPreparedCaster ? (c.spells ?? []).filter(s => s.level > 0 && s.prepared).length : 0
   const byLevel: Record<number, Spell[]> = {}
-  ;(c.spells ?? []).forEach(spell => {
+  visibleSpells.forEach(spell => {
     if (!byLevel[spell.level]) byLevel[spell.level] = []
     byLevel[spell.level].push(spell)
   })
@@ -94,7 +109,17 @@ export default function SpellsSection({ character: c }: Props) {
     <div>
       {/* Section header */}
       <div style={{ background: 'var(--white)', border: '1px solid var(--border)', borderTop: 'none', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px' }}>
-        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.5px' }}>Spells</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.5px' }}>Spells</span>
+          {isPreparedCaster && (
+            <button
+              onClick={() => setPreparedOnly(v => !v)}
+              style={{ fontSize: 11, padding: '2px 8px', border: `1px solid ${preparedOnly ? 'var(--purple)' : 'var(--border2)'}`, background: preparedOnly ? 'var(--purple-light)' : 'var(--white)', color: preparedOnly ? 'var(--purple)' : 'var(--text3)', borderRadius: 3, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}
+            >
+              Prepared {preparedCount > 0 ? `(${preparedCount})` : ''}
+            </button>
+          )}
+        </div>
         <button onClick={() => setShowAddModal(true)} style={{ fontSize: 13, color: 'var(--purple)', cursor: 'pointer', fontWeight: 500, background: 'none', border: 'none', fontFamily: 'inherit', padding: 0 }}>+ Add Spell</button>
       </div>
 
@@ -141,20 +166,31 @@ export default function SpellsSection({ character: c }: Props) {
           <div style={{ padding: '5px 14px', background: '#fafafa', borderBottom: '1px solid var(--border)', border: '1px solid var(--border)', borderTop: '1px solid var(--border)', borderLeft: '1px solid var(--border)', fontSize: 11, fontWeight: 600, color: 'var(--purple)', letterSpacing: '.5px', textTransform: 'uppercase' }}>
             {LEVEL_NAMES[Number(level)]} Spells
           </div>
-          {spells.map(spell => (
-            <div key={spell.name} onClick={() => setOpenSpell(spell)} style={{ display: 'flex', alignItems: 'center', padding: '9px 14px', borderBottom: '1px solid var(--border)', border: '1px solid var(--border)', borderTop: 'none', gap: 10, cursor: 'pointer', background: 'var(--white)' }}
-              onMouseEnter={e => (e.currentTarget.style.background = '#fafafa')}
-              onMouseLeave={e => (e.currentTarget.style.background = 'var(--white)')}
-            >
-              <div style={{ flex: 1 }}>
-                <span style={{ fontSize: 14, fontWeight: 500 }}>{spell.name}</span>
-                {spell.concentration && <span style={{ fontSize: 10, background: 'var(--teal-light)', color: 'var(--teal2)', padding: '1px 6px', borderRadius: 2, fontWeight: 600, marginLeft: 5 }}>C</span>}
-                {spell.ritual && <span style={{ fontSize: 10, background: '#f3f0ff', color: 'var(--purple)', padding: '1px 6px', borderRadius: 2, fontWeight: 600, marginLeft: 4 }}>R</span>}
+          {spells.map(spell => {
+            const cs = c.spells?.find(s => s.name === spell.name)
+            const isPrepared = cs?.prepared ?? false
+            return (
+              <div key={spell.name} style={{ display: 'flex', alignItems: 'center', padding: '9px 14px', borderBottom: '1px solid var(--border)', border: '1px solid var(--border)', borderTop: 'none', gap: 10, background: 'var(--white)', opacity: isPreparedCaster && spell.level > 0 && !isPrepared ? 0.5 : 1 }}
+                onMouseEnter={e => (e.currentTarget.style.background = '#fafafa')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'var(--white)')}
+              >
+                {isPreparedCaster && spell.level > 0 && (
+                  <button
+                    onClick={e => { e.stopPropagation(); togglePrepared(spell.name) }}
+                    title={isPrepared ? 'Unprepare' : 'Prepare'}
+                    style={{ width: 18, height: 18, borderRadius: '50%', border: `2px solid ${isPrepared ? 'var(--purple)' : 'var(--border2)'}`, background: isPrepared ? 'var(--purple)' : 'var(--white)', cursor: 'pointer', flexShrink: 0, padding: 0 }}
+                  />
+                )}
+                <div style={{ flex: 1 }} onClick={() => setOpenSpell(spell)}>
+                  <span style={{ fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>{spell.name}</span>
+                  {spell.concentration && <span style={{ fontSize: 10, background: 'var(--teal-light)', color: 'var(--teal2)', padding: '1px 6px', borderRadius: 2, fontWeight: 600, marginLeft: 5 }}>C</span>}
+                  {spell.ritual && <span style={{ fontSize: 10, background: '#f3f0ff', color: 'var(--purple)', padding: '1px 6px', borderRadius: 2, fontWeight: 600, marginLeft: 4 }}>R</span>}
+                </div>
+                <span style={{ fontSize: 11, color: SCHOOL_COLORS[spell.school] ?? 'var(--text3)', fontWeight: 600 }} onClick={() => setOpenSpell(spell)}>{spell.school.slice(0, 3).toUpperCase()}</span>
+                {spell.damage && <span style={{ fontSize: 12, color: 'var(--text3)' }} onClick={() => setOpenSpell(spell)}>{spell.damage}</span>}
               </div>
-              <span style={{ fontSize: 11, color: SCHOOL_COLORS[spell.school] ?? 'var(--text3)', fontWeight: 600 }}>{spell.school.slice(0, 3).toUpperCase()}</span>
-              {spell.damage && <span style={{ fontSize: 12, color: 'var(--text3)' }}>{spell.damage}</span>}
-            </div>
-          ))}
+            )
+          })}
         </div>
       ))}
 
