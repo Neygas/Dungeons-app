@@ -5,12 +5,13 @@ import { calcArmorAC } from '@/lib/calculations'
 import { useCharacterStore } from '@/store/characterStore'
 import { useUIStore } from '@/store/uiStore'
 import AddModal from '@/components/shared/AddModal'
+import SwipeToDelete from '@/components/shared/SwipeToDelete'
 
 interface Props { character: Character }
 
 export default function ArmorSection({ character: c }: Props) {
   const { patchActiveCharacter } = useCharacterStore()
-  const { showToast, editMode } = useUIStore()
+  const { showToast } = useUIStore()
   const [showAddModal, setShowAddModal] = useState(false)
   const [dbFilter, setDbFilter] = useState('All')
   const [openArmor, setOpenArmor] = useState<typeof ARMOR_DB[number] | null>(null)
@@ -83,18 +84,17 @@ export default function ArmorSection({ character: c }: Props) {
         const a = ARMOR_DB.find(x => x.name === name)
         const isEquipped = c.equipped_armor === name
         return (
-          <div key={name} style={{ display: 'flex', alignItems: 'center', padding: '10px 14px', border: '1px solid var(--border)', borderTop: 'none', background: isEquipped ? '#f8fffe' : 'var(--white)', gap: 10 }}>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 14, fontWeight: isEquipped ? 600 : 500 }}>{name}</div>
-              {a && <div style={{ fontSize: 12, color: 'var(--text3)' }}>AC {a.ac}{a.dexBonus ? ` + DEX${a.maxDex ? ` (max ${a.maxDex})` : ''}` : ''} · {a.category}</div>}
+          <SwipeToDelete key={name} onDelete={() => removeArmor(name)}>
+            <div style={{ display: 'flex', alignItems: 'center', padding: '10px 14px', border: '1px solid var(--border)', borderTop: 'none', background: isEquipped ? '#f8fffe' : 'var(--white)', gap: 10 }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 14, fontWeight: isEquipped ? 600 : 500 }}>{name}</div>
+                {a && <div style={{ fontSize: 12, color: 'var(--text3)' }}>AC {a.ac}{a.dexBonus ? ` + DEX${a.maxDex ? ` (max ${a.maxDex})` : ''}` : ''} · {a.category}</div>}
+              </div>
+              {!isEquipped && name !== 'Shield' && (
+                <button onClick={() => equipArmor(name)} style={{ padding: '4px 10px', border: '1px solid var(--border2)', background: 'var(--white)', fontSize: 12, cursor: 'pointer', borderRadius: 2, fontFamily: 'inherit', color: 'var(--text2)' }}>Equip</button>
+              )}
             </div>
-            {!isEquipped && name !== 'Shield' && (
-              <button onClick={() => equipArmor(name)} style={{ padding: '4px 10px', border: '1px solid var(--border2)', background: 'var(--white)', fontSize: 12, cursor: 'pointer', borderRadius: 2, fontFamily: 'inherit', color: 'var(--text2)' }}>Equip</button>
-            )}
-            {editMode && (
-              <button onClick={() => removeArmor(name)} style={{ padding: '4px 8px', border: '1px solid var(--red)', background: '#fde8e8', fontSize: 12, cursor: 'pointer', borderRadius: 2, fontFamily: 'inherit', color: 'var(--red)' }}>✕</button>
-            )}
-          </div>
+          </SwipeToDelete>
         )
       })}
 

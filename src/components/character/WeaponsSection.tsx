@@ -6,6 +6,7 @@ import { useCharacterStore } from '@/store/characterStore'
 import { useUIStore } from '@/store/uiStore'
 import { useSessionStore } from '@/store/sessionStore'
 import AddModal from '@/components/shared/AddModal'
+import SwipeToDelete from '@/components/shared/SwipeToDelete'
 import type { Weapon } from '@/types'
 
 interface Props { character: Character }
@@ -40,7 +41,7 @@ function dmgBonus(c: Character, w: Weapon, finesseChoice?: 'str' | 'dex'): numbe
 
 export default function WeaponsSection({ character: c }: Props) {
   const { patchActiveCharacter } = useCharacterStore()
-  const { showToast, editMode } = useUIStore()
+  const { showToast } = useUIStore()
   const { logEntry, getJoinedSession } = useSessionStore()
   const [showAddModal, setShowAddModal] = useState(false)
   const [dbFilter, setDbFilter] = useState('All')
@@ -202,16 +203,17 @@ export default function WeaponsSection({ character: c }: Props) {
         const atk = dbW ? atkBonus(c, dbW, fc) : null
         const isActive = w.name === activeWeapon
         return (
-          <div key={w.name} style={{ display: 'flex', alignItems: 'center', padding: '10px 14px', borderBottom: '1px solid var(--border)', border: '1px solid var(--border)', borderTop: 'none', background: isActive ? '#f8fffe' : 'var(--white)', gap: 10 }}>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 14, fontWeight: isActive ? 600 : 500 }}>{w.name}</div>
-              {dbW && <div style={{ fontSize: 12, color: 'var(--text3)' }}>{dbW.damage} {dbW.damageType} · {dbW.category}</div>}
+          <SwipeToDelete key={w.name} onDelete={() => removeWeapon(w.name)}>
+            <div style={{ display: 'flex', alignItems: 'center', padding: '10px 14px', borderBottom: '1px solid var(--border)', border: '1px solid var(--border)', borderTop: 'none', background: isActive ? '#f8fffe' : 'var(--white)', gap: 10 }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 14, fontWeight: isActive ? 600 : 500 }}>{w.name}</div>
+                {dbW && <div style={{ fontSize: 12, color: 'var(--text3)' }}>{dbW.damage} {dbW.damageType} · {dbW.category}</div>}
+              </div>
+              {atk !== null && <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--teal2)', minWidth: 32, textAlign: 'right' }}>{fmtBonus(atk)}</span>}
+              {!isActive && <button onClick={() => setActive(w.name)} style={{ padding: '4px 10px', border: '1px solid var(--border2)', background: 'var(--white)', fontSize: 12, cursor: 'pointer', borderRadius: 2, fontFamily: 'inherit', color: 'var(--text2)' }}>Equip</button>}
+              {dbW && <button onClick={() => setOpenWeapon(dbW)} style={{ padding: '4px 10px', border: '1px solid var(--border2)', background: 'var(--white)', fontSize: 12, cursor: 'pointer', borderRadius: 2, fontFamily: 'inherit', color: 'var(--text2)' }}>Info</button>}
             </div>
-            {atk !== null && <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--teal2)', minWidth: 32, textAlign: 'right' }}>{fmtBonus(atk)}</span>}
-            {!isActive && <button onClick={() => setActive(w.name)} style={{ padding: '4px 10px', border: '1px solid var(--border2)', background: 'var(--white)', fontSize: 12, cursor: 'pointer', borderRadius: 2, fontFamily: 'inherit', color: 'var(--text2)' }}>Equip</button>}
-            {dbW && <button onClick={() => setOpenWeapon(dbW)} style={{ padding: '4px 10px', border: '1px solid var(--border2)', background: 'var(--white)', fontSize: 12, cursor: 'pointer', borderRadius: 2, fontFamily: 'inherit', color: 'var(--text2)' }}>Info</button>}
-            {editMode && <button onClick={() => removeWeapon(w.name)} style={{ padding: '4px 8px', border: '1px solid var(--red)', background: '#fde8e8', fontSize: 12, cursor: 'pointer', borderRadius: 2, fontFamily: 'inherit', color: 'var(--red)' }}>✕</button>}
-          </div>
+          </SwipeToDelete>
         )
       })}
 

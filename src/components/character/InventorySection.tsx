@@ -5,6 +5,7 @@ import { useCharacterStore } from '@/store/characterStore'
 import { useUIStore } from '@/store/uiStore'
 import { useSessionStore } from '@/store/sessionStore'
 import AddModal from '@/components/shared/AddModal'
+import SwipeToDelete from '@/components/shared/SwipeToDelete'
 import { useLongPress } from '@/lib/useLongPress'
 
 function CurrencyCell({ field, value, onCommit }: { field: string; value: number; onCommit: (val: string) => void }) {
@@ -50,7 +51,7 @@ interface Props { character: Character }
 
 export default function InventorySection({ character: c }: Props) {
   const { patchActiveCharacter } = useCharacterStore()
-  const { showToast, editMode } = useUIStore()
+  const { showToast } = useUIStore()
   const { logEntry, getJoinedSession } = useSessionStore()
   const [showAddModal, setShowAddModal] = useState(false)
   const [dbFilter, setDbFilter] = useState('All')
@@ -125,26 +126,25 @@ export default function InventorySection({ character: c }: Props) {
         <div style={{ background: 'var(--white)', border: '1px solid var(--border)', borderTop: 'none', padding: '16px 14px', fontSize: 13, color: 'var(--text3)' }}>No items</div>
       )}
       {(c.inventory ?? []).map((item: InventoryItem) => (
-        <div key={item.name} style={{ display: 'flex', alignItems: 'center', padding: '9px 14px', border: '1px solid var(--border)', borderTop: 'none', background: 'var(--white)', gap: 10 }}>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 14 }}>{item.name}</div>
-            {item.cost && <div style={{ fontSize: 11, color: 'var(--text3)' }}>{item.cost}</div>}
+        <SwipeToDelete key={item.name} onDelete={() => adjustQty(item.name, -item.quantity)}>
+          <div style={{ display: 'flex', alignItems: 'center', padding: '9px 14px', border: '1px solid var(--border)', borderTop: 'none', background: 'var(--white)', gap: 10 }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 14 }}>{item.name}</div>
+              {item.cost && <div style={{ fontSize: 11, color: 'var(--text3)' }}>{item.cost}</div>}
+            </div>
+            <button
+              onClick={() => { setUseItem(item); setUseQty('1') }}
+              style={{ padding: '4px 9px', border: '1px solid var(--teal)', background: 'var(--teal-light)', fontSize: 12, cursor: 'pointer', borderRadius: 2, fontFamily: 'inherit', color: 'var(--teal2)', fontWeight: 600 }}
+            >
+              Use
+            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <button onClick={() => adjustQty(item.name, -1)} style={{ width: 28, height: 28, border: '1px solid var(--border2)', background: 'var(--white)', cursor: 'pointer', fontSize: 16, borderRadius: 2, color: 'var(--text3)', fontFamily: 'inherit', padding: 0 }}>−</button>
+              <span style={{ fontSize: 15, fontWeight: 700, minWidth: 24, textAlign: 'center' }}>{item.quantity}</span>
+              <button onClick={() => adjustQty(item.name, 1)} style={{ width: 28, height: 28, border: '1px solid var(--border2)', background: 'var(--white)', cursor: 'pointer', fontSize: 16, borderRadius: 2, color: 'var(--text3)', fontFamily: 'inherit', padding: 0 }}>+</button>
+            </div>
           </div>
-          <button
-            onClick={() => { setUseItem(item); setUseQty('1') }}
-            style={{ padding: '4px 9px', border: '1px solid var(--teal)', background: 'var(--teal-light)', fontSize: 12, cursor: 'pointer', borderRadius: 2, fontFamily: 'inherit', color: 'var(--teal2)', fontWeight: 600 }}
-          >
-            Use
-          </button>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <button onClick={() => adjustQty(item.name, -1)} style={{ width: 28, height: 28, border: '1px solid var(--border2)', background: 'var(--white)', cursor: 'pointer', fontSize: 16, borderRadius: 2, color: 'var(--text3)', fontFamily: 'inherit', padding: 0 }}>−</button>
-            <span style={{ fontSize: 15, fontWeight: 700, minWidth: 24, textAlign: 'center' }}>{item.quantity}</span>
-            <button onClick={() => adjustQty(item.name, 1)} style={{ width: 28, height: 28, border: '1px solid var(--border2)', background: 'var(--white)', cursor: 'pointer', fontSize: 16, borderRadius: 2, color: 'var(--text3)', fontFamily: 'inherit', padding: 0 }}>+</button>
-          </div>
-          {editMode && (
-            <button onClick={() => adjustQty(item.name, -item.quantity)} style={{ padding: '4px 8px', border: '1px solid var(--red)', background: '#fde8e8', fontSize: 12, cursor: 'pointer', borderRadius: 2, fontFamily: 'inherit', color: 'var(--red)' }}>✕</button>
-          )}
-        </div>
+        </SwipeToDelete>
       ))}
 
       {/* Use item modal */}

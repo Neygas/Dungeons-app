@@ -6,6 +6,7 @@ import { useSessionStore } from '@/store/sessionStore'
 import { supabase } from '@/lib/supabase'
 import type { Character, Session, LootItem, ShopItem, LootRarity } from '@/types'
 import { RARITY_COLORS, RARITY_LABELS } from '@/data/lootTemplates'
+import SwipeToDelete from '@/components/shared/SwipeToDelete'
 
 function RarityBadge({ rarity }: { rarity?: LootRarity }) {
   if (!rarity) return null
@@ -41,50 +42,47 @@ function CharacterCard({ character, sessionCode, onClick, onLeave, onDelete }: {
   const hpColor = hpPercent > 0.5 ? 'var(--green)' : hpPercent > 0.2 ? 'var(--orange)' : 'var(--red)'
 
   return (
-    <div style={{ background: 'var(--white)', border: '1px solid var(--border)', borderTop: 'none' }}>
-      <div
-        onClick={onClick}
-        style={{ padding: '14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 14 }}
-        onMouseEnter={e => (e.currentTarget.style.background = 'var(--teal-light)')}
-        onMouseLeave={e => (e.currentTarget.style.background = 'var(--white)')}
-      >
-        <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'var(--teal-light)', border: '2px solid var(--teal)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0, overflow: 'hidden' }}>
-          {character.photo_url
-            ? <img src={character.photo_url} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
-            : classIcon(character.class)}
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 2, color: character.inspiration ? 'var(--gold)' : 'var(--text)' }}>{character.name}</div>
-          <div style={{ fontSize: 12, color: 'var(--text3)' }}>Level {character.level} {character.race} {character.class}</div>
-          <div style={{ marginTop: 6, background: '#eee', height: 4, borderRadius: 2 }}>
-            <div style={{ height: 4, borderRadius: 2, background: hpColor, width: `${Math.max(0, Math.min(100, hpPercent * 100))}%`, transition: 'width .3s' }} />
+    <SwipeToDelete onDelete={onDelete}>
+      <div style={{ background: 'var(--white)', border: '1px solid var(--border)', borderTop: 'none' }}>
+        <div
+          onClick={onClick}
+          style={{ padding: '14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 14 }}
+          onMouseEnter={e => (e.currentTarget.style.background = 'var(--teal-light)')}
+          onMouseLeave={e => (e.currentTarget.style.background = 'var(--white)')}
+        >
+          <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'var(--teal-light)', border: '2px solid var(--teal)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0, overflow: 'hidden' }}>
+            {character.photo_url
+              ? <img src={character.photo_url} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+              : classIcon(character.class)}
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 2, color: character.inspiration ? 'var(--gold)' : 'var(--text)' }}>{character.name}</div>
+            <div style={{ fontSize: 12, color: 'var(--text3)' }}>Level {character.level} {character.race} {character.class}</div>
+            <div style={{ marginTop: 6, background: '#eee', height: 4, borderRadius: 2 }}>
+              <div style={{ height: 4, borderRadius: 2, background: hpColor, width: `${Math.max(0, Math.min(100, hpPercent * 100))}%`, transition: 'width .3s' }} />
+            </div>
+          </div>
+          <div style={{ textAlign: 'right', flexShrink: 0 }}>
+            <div style={{ fontSize: 16, fontWeight: 700, color: hpColor }}>{character.hp}</div>
+            <div style={{ fontSize: 11, color: 'var(--text3)' }}>/ {character.max_hp} HP</div>
           </div>
         </div>
-        <div style={{ textAlign: 'right', flexShrink: 0 }}>
-          <div style={{ fontSize: 16, fontWeight: 700, color: hpColor }}>{character.hp}</div>
-          <div style={{ fontSize: 11, color: 'var(--text3)' }}>/ {character.max_hp} HP</div>
-        </div>
-        <button
-          onClick={e => { e.stopPropagation(); onDelete() }}
-          title="Delete character"
-          style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', fontSize: 16, padding: '4px', flexShrink: 0, lineHeight: 1 }}
-        >🗑</button>
-      </div>
 
-      {sessionCode && (
-        <div style={{ padding: '6px 14px 10px', display: 'flex', alignItems: 'center', gap: 8, borderTop: '1px solid var(--border)' }}>
-          <span style={{ fontSize: 11, background: 'var(--teal-light)', color: 'var(--teal2)', padding: '3px 8px', borderRadius: 4, fontWeight: 600, flex: 1 }}>
-            Session: <span style={{ letterSpacing: 1, fontWeight: 700 }}>{sessionCode}</span>
-          </span>
-          <button
-            onClick={e => { e.stopPropagation(); onLeave() }}
-            style={{ fontSize: 11, color: 'var(--red)', background: 'none', border: '1px solid var(--red)', padding: '3px 8px', borderRadius: 4, cursor: 'pointer', fontFamily: 'inherit' }}
-          >
-            Leave
-          </button>
-        </div>
-      )}
-    </div>
+        {sessionCode && (
+          <div style={{ padding: '6px 14px 10px', display: 'flex', alignItems: 'center', gap: 8, borderTop: '1px solid var(--border)' }}>
+            <span style={{ fontSize: 11, background: 'var(--teal-light)', color: 'var(--teal2)', padding: '3px 8px', borderRadius: 4, fontWeight: 600, flex: 1 }}>
+              Session: <span style={{ letterSpacing: 1, fontWeight: 700 }}>{sessionCode}</span>
+            </span>
+            <button
+              onClick={e => { e.stopPropagation(); onLeave() }}
+              style={{ fontSize: 11, color: 'var(--red)', background: 'none', border: '1px solid var(--red)', padding: '3px 8px', borderRadius: 4, cursor: 'pointer', fontFamily: 'inherit' }}
+            >
+              Leave
+            </button>
+          </div>
+        )}
+      </div>
+    </SwipeToDelete>
   )
 }
 

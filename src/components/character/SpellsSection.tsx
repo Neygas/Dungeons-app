@@ -6,6 +6,7 @@ import { spellSaveDC, spellAttackBonus, fmtBonus } from '@/lib/calculations'
 import { useCharacterStore } from '@/store/characterStore'
 import { useUIStore } from '@/store/uiStore'
 import AddModal from '@/components/shared/AddModal'
+import SwipeToDelete from '@/components/shared/SwipeToDelete'
 
 interface Props { character: Character }
 
@@ -170,25 +171,27 @@ export default function SpellsSection({ character: c }: Props) {
             const cs = c.spells?.find(s => s.name === spell.name)
             const isPrepared = cs?.prepared ?? false
             return (
-              <div key={spell.name} style={{ display: 'flex', alignItems: 'center', padding: '9px 14px', borderBottom: '1px solid var(--border)', border: '1px solid var(--border)', borderTop: 'none', gap: 10, background: 'var(--white)', opacity: isPreparedCaster && spell.level > 0 && !isPrepared ? 0.5 : 1 }}
-                onMouseEnter={e => (e.currentTarget.style.background = '#fafafa')}
-                onMouseLeave={e => (e.currentTarget.style.background = 'var(--white)')}
-              >
-                {isPreparedCaster && spell.level > 0 && (
-                  <button
-                    onClick={e => { e.stopPropagation(); togglePrepared(spell.name) }}
-                    title={isPrepared ? 'Unprepare' : 'Prepare'}
-                    style={{ width: 18, height: 18, borderRadius: '50%', border: `2px solid ${isPrepared ? 'var(--purple)' : 'var(--border2)'}`, background: isPrepared ? 'var(--purple)' : 'var(--white)', cursor: 'pointer', flexShrink: 0, padding: 0 }}
-                  />
-                )}
-                <div style={{ flex: 1 }} onClick={() => setOpenSpell(spell)}>
-                  <span style={{ fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>{spell.name}</span>
-                  {spell.concentration && <span style={{ fontSize: 10, background: 'var(--teal-light)', color: 'var(--teal2)', padding: '1px 6px', borderRadius: 2, fontWeight: 600, marginLeft: 5 }}>C</span>}
-                  {spell.ritual && <span style={{ fontSize: 10, background: '#f3f0ff', color: 'var(--purple)', padding: '1px 6px', borderRadius: 2, fontWeight: 600, marginLeft: 4 }}>R</span>}
+              <SwipeToDelete key={spell.name} onDelete={() => removeSpell(spell.name)}>
+                <div style={{ display: 'flex', alignItems: 'center', padding: '9px 14px', borderBottom: '1px solid var(--border)', border: '1px solid var(--border)', borderTop: 'none', gap: 10, background: 'var(--white)', opacity: isPreparedCaster && spell.level > 0 && !isPrepared ? 0.5 : 1 }}
+                  onMouseEnter={e => (e.currentTarget.style.background = '#fafafa')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'var(--white)')}
+                >
+                  {isPreparedCaster && spell.level > 0 && (
+                    <button
+                      onClick={e => { e.stopPropagation(); togglePrepared(spell.name) }}
+                      title={isPrepared ? 'Unprepare' : 'Prepare'}
+                      style={{ width: 18, height: 18, borderRadius: '50%', border: `2px solid ${isPrepared ? 'var(--purple)' : 'var(--border2)'}`, background: isPrepared ? 'var(--purple)' : 'var(--white)', cursor: 'pointer', flexShrink: 0, padding: 0 }}
+                    />
+                  )}
+                  <div style={{ flex: 1 }} onClick={() => setOpenSpell(spell)}>
+                    <span style={{ fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>{spell.name}</span>
+                    {spell.concentration && <span style={{ fontSize: 10, background: 'var(--teal-light)', color: 'var(--teal2)', padding: '1px 6px', borderRadius: 2, fontWeight: 600, marginLeft: 5 }}>C</span>}
+                    {spell.ritual && <span style={{ fontSize: 10, background: '#f3f0ff', color: 'var(--purple)', padding: '1px 6px', borderRadius: 2, fontWeight: 600, marginLeft: 4 }}>R</span>}
+                  </div>
+                  <span style={{ fontSize: 11, color: SCHOOL_COLORS[spell.school] ?? 'var(--text3)', fontWeight: 600 }} onClick={() => setOpenSpell(spell)}>{spell.school.slice(0, 3).toUpperCase()}</span>
+                  {spell.damage && <span style={{ fontSize: 12, color: 'var(--text3)' }} onClick={() => setOpenSpell(spell)}>{spell.damage}</span>}
                 </div>
-                <span style={{ fontSize: 11, color: SCHOOL_COLORS[spell.school] ?? 'var(--text3)', fontWeight: 600 }} onClick={() => setOpenSpell(spell)}>{spell.school.slice(0, 3).toUpperCase()}</span>
-                {spell.damage && <span style={{ fontSize: 12, color: 'var(--text3)' }} onClick={() => setOpenSpell(spell)}>{spell.damage}</span>}
-              </div>
+              </SwipeToDelete>
             )
           })}
         </div>
