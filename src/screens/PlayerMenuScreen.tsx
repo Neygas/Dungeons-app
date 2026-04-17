@@ -30,11 +30,12 @@ function classIcon(cls: string) {
   return icons[cls] ?? '🎲'
 }
 
-function CharacterCard({ character, sessionCode, onClick, onLeave }: {
+function CharacterCard({ character, sessionCode, onClick, onLeave, onDelete }: {
   character: Character
   sessionCode: string | null
   onClick: () => void
   onLeave: () => void
+  onDelete: () => void
 }) {
   const hpPercent = character.max_hp > 0 ? character.hp / character.max_hp : 1
   const hpColor = hpPercent > 0.5 ? 'var(--green)' : hpPercent > 0.2 ? 'var(--orange)' : 'var(--red)'
@@ -63,6 +64,11 @@ function CharacterCard({ character, sessionCode, onClick, onLeave }: {
           <div style={{ fontSize: 16, fontWeight: 700, color: hpColor }}>{character.hp}</div>
           <div style={{ fontSize: 11, color: 'var(--text3)' }}>/ {character.max_hp} HP</div>
         </div>
+        <button
+          onClick={e => { e.stopPropagation(); onDelete() }}
+          title="Delete character"
+          style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', fontSize: 16, padding: '4px', flexShrink: 0, lineHeight: 1 }}
+        >🗑</button>
       </div>
 
       {sessionCode && (
@@ -85,7 +91,7 @@ function CharacterCard({ character, sessionCode, onClick, onLeave }: {
 export default function PlayerMenuScreen() {
   const navigate = useNavigate()
   const { user, signOut } = useAuthStore()
-  const { characters, loading, fetchCharacters } = useCharacterStore()
+  const { characters, loading, fetchCharacters, deleteCharacter } = useCharacterStore()
   const { joinSession, leaveSession, getJoinedSession, confirmLootClaims, purchaseItem } = useSessionStore()
 
   const [sessionCode, setSessionCode] = useState('')
@@ -103,6 +109,7 @@ export default function PlayerMenuScreen() {
   const [shopError, setShopError] = useState('')
   const [shopDetailItem, setShopDetailItem] = useState<ShopItem | null>(null)
   const [toast, setToast] = useState('')
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
   const showToast = (msg: string) => {
     setToast(msg)
@@ -157,6 +164,12 @@ export default function PlayerMenuScreen() {
     } else {
       setSessionCode('')
     }
+  }
+
+  const handleDelete = async (characterId: string) => {
+    await deleteCharacter(characterId)
+    setConfirmDeleteId(null)
+    showToast('Character deleted')
   }
 
   const handleLeave = async (characterId: string) => {
@@ -221,6 +234,7 @@ export default function PlayerMenuScreen() {
                 sessionCode={sid}
                 onClick={() => navigate(`/characters/${c.id}`)}
                 onLeave={() => handleLeave(c.id)}
+                onDelete={() => setConfirmDeleteId(c.id)}
               />
               {/* Loot / Shop buttons when DM opens them */}
               {sid && (
@@ -477,6 +491,36 @@ export default function PlayerMenuScreen() {
               >
                 {canAfford ? `Buy for ${shopDetailItem.price} gp` : 'Not enough gold'}
               </button>
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* ── Delete confirmation ──────────────────────────────────────────────── */}
+      {confirmDeleteId && (() => {
+        const char = characters.find(c => c.id === confirmDeleteId)
+        if (!char) return null
+        return (
+          <div onClick={() => setConfirmDeleteId(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+            <div onClick={e => e.stopPropagation()} style={{ background: 'var(--white)', borderRadius: 10, width: '100%', maxWidth: 340, padding: 22 }}>
+              <div style={{ fontSize: 17, fontWeight: 700, marginBottom: 8 }}>Delete character?</div>
+              <div style={{ fontSize: 14, color: 'var(--text2)', marginBottom: 20 }}>
+                <strong>{char.name}</strong> will be permanently deleted. This cannot be undone.
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  onClick={() => handleDelete(confirmDeleteId)}
+                  style={{ flex: 1, padding: 12, background: 'var(--red)', color: '#fff', border: 'none', fontSize: 14, fontWeight: 600, cursor: 'pointer', borderRadius: 3, fontFamily: 'inherit' }}
+                >
+                  Delete
+                </button>
+                <button
+                  onClick={() => setConfirmDeleteId(null)}
+                  style={{ flex: 1, padding: 12, background: 'var(--white)', color: 'var(--text2)', border: '1px solid var(--border2)', fontSize: 14, cursor: 'pointer', borderRadius: 3, fontFamily: 'inherit' }}
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
           </div>
         )
