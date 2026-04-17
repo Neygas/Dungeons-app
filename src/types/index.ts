@@ -154,6 +154,10 @@ export interface Character {
   inspiration: boolean
   conditions: string[]
 
+  // Class features
+  feature_uses: Record<string, number>
+  features_active: Record<string, boolean>
+
   // Bio
   personality: string
   ideals: string

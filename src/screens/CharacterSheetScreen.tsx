@@ -15,12 +15,14 @@ import WeaponsSection from '@/components/character/WeaponsSection'
 import ArmorSection from '@/components/character/ArmorSection'
 import InventorySection from '@/components/character/InventorySection'
 import InfoSheet from '@/components/character/InfoSheet'
+import ClassFeaturesSection from '@/components/character/ClassFeaturesSection'
 import BottomSheet from '@/components/shared/BottomSheet'
 import Toast from '@/components/shared/Toast'
+import DiceRoller from '@/components/shared/DiceRoller'
 import { CLASSES, XP_TABLE } from '@/data'
 
-const NAV_TABS = ['Stats', 'Spells', 'Combat', 'Gear']
-const SECTION_IDS = ['section-stats', 'section-spells', 'section-combat', 'section-gear']
+const NAV_TABS = ['Stats', 'Spells', 'Combat', 'Gear', 'Features']
+const SECTION_IDS = ['section-stats', 'section-spells', 'section-combat', 'section-gear', 'section-features']
 
 // ── Photo modal ────────────────────────────────────────────────────────────────
 function PhotoModal({ current, onSave, onClose }: { current: string; onSave: (url: string) => void; onClose: () => void }) {
@@ -49,6 +51,7 @@ export default function CharacterSheetScreen() {
   const { getJoinedSession, subscribeToSession, activeSession, logEntry } = useSessionStore()
   const [collapsed, setCollapsed] = useState(false)
   const [showPhotoModal, setShowPhotoModal] = useState(false)
+  const [showDiceRoller, setShowDiceRoller] = useState(false)
   const [infoInitialTab, setInfoInitialTab] = useState<'about' | 'exp' | 'quick'>('about')
   const [showConSave, setShowConSave] = useState(false)
   const [conSaveDC, setConSaveDC] = useState(10)
@@ -287,6 +290,14 @@ export default function CharacterSheetScreen() {
         <InventorySection character={c} />
       </div>
 
+      {/* ── FEATURES SECTION ── */}
+      <div id="section-features" style={{ paddingTop: 8 }}>
+        <div style={{ background: 'var(--white)', border: '1px solid var(--border)', padding: '8px 14px' }}>
+          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.5px' }}>— Class Features —</span>
+        </div>
+        <ClassFeaturesSection character={c} />
+      </div>
+
       {/* ── BOTTOM SHEETS ── */}
       <BottomSheet open={activeSheet === 'conditions'} onClose={closeSheet} title="Conditions">
         <ConditionsSheet character={c} />
@@ -309,6 +320,20 @@ export default function CharacterSheetScreen() {
           Edit Mode — tap here to exit
         </div>
       )}
+
+      {/* Dice roller FAB */}
+      {!editMode && (
+        <button
+          onClick={() => setShowDiceRoller(true)}
+          style={{ position: 'fixed', bottom: 22, right: 18, width: 48, height: 48, borderRadius: '50%', background: 'var(--teal)', border: 'none', color: '#fff', fontSize: 22, cursor: 'pointer', zIndex: 90, boxShadow: '0 4px 16px rgba(0,0,0,.22)', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'transform .15s', fontFamily: 'inherit' }}
+          aria-label="Open dice roller"
+        >
+          ⚄
+        </button>
+      )}
+
+      {/* Dice roller */}
+      {showDiceRoller && <DiceRoller onClose={() => setShowDiceRoller(false)} />}
 
       {/* Photo modal */}
       {showPhotoModal && (
