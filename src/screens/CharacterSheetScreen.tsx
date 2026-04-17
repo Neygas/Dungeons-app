@@ -111,7 +111,9 @@ export default function CharacterSheetScreen() {
   // Auto-reset round features when it becomes this character's turn
   useEffect(() => {
     if (!activeCharacter) return
-    if (isTurn && !prevIsTurnRef.current) {
+    const turnEntry = activeSession?.initiative[activeSession.current_turn] ?? null
+    const isMyTurn = !!activeSession?.combat_active && turnEntry?.characterId === activeCharacter.id
+    if (isMyTurn && !prevIsTurnRef.current) {
       const roundFeatures = getFeaturesForCharacter(activeCharacter).filter(f => f.resetOn === 'round')
       if (roundFeatures.length > 0) {
         const newUses = { ...(activeCharacter.feature_uses ?? {}) }
@@ -119,8 +121,8 @@ export default function CharacterSheetScreen() {
         useCharacterStore.getState().patchActiveCharacter({ feature_uses: newUses })
       }
     }
-    prevIsTurnRef.current = isTurn
-  }, [isTurn]) // eslint-disable-line react-hooks/exhaustive-deps
+    prevIsTurnRef.current = isMyTurn
+  }, [activeSession?.current_turn, activeSession?.combat_active]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const scrollToSection = (idx: number) => {
     const el = document.getElementById(SECTION_IDS[idx])
