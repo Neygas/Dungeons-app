@@ -19,6 +19,10 @@
   --red: #dc3545;
   --orange: #e07b00;
   --gold: #b38a00;
+
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 * {
@@ -37,5 +41,13 @@ body {
 
 #root {
   min-height: 100vh;
+}
+
+button {
+  transition: transform 160ms var(--ease-out);
+}
+
+button:active {
+  transform: scale(0.97);
 }
 

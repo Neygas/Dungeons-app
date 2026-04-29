@@ -59,7 +59,7 @@ function CharacterCard({ character, sessionCode, onClick, onLeave, onDelete }: {
             <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 2, color: character.inspiration ? 'var(--gold)' : 'var(--text)' }}>{character.name}</div>
             <div style={{ fontSize: 12, color: 'var(--text3)' }}>Level {character.level} {character.race} {character.class}</div>
             <div style={{ marginTop: 6, background: '#eee', height: 4, borderRadius: 2 }}>
-              <div style={{ height: 4, borderRadius: 2, background: hpColor, width: `${Math.max(0, Math.min(100, hpPercent * 100))}%`, transition: 'width .3s' }} />
+              <div style={{ height: 4, borderRadius: 2, background: hpColor, width: `${Math.max(0, Math.min(100, hpPercent * 100))}%`, transition: 'width 300ms var(--ease-out)' }} />
             </div>
           </div>
           <div style={{ textAlign: 'right', flexShrink: 0 }}>

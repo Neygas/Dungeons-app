@@ -128,7 +128,7 @@ export default function HPSection({ character: c }: Props) {
 
         {/* HP bar */}
         <div style={{ background: '#eee', height: 8, borderRadius: 4 }}>
-          <div style={{ height: 8, borderRadius: 4, background: color, width: `${pct * 100}%`, transition: 'width .4s, background .4s' }} />
+          <div style={{ height: 8, borderRadius: 4, background: color, width: `${pct * 100}%`, transition: 'width 300ms var(--ease-out), background 300ms var(--ease-out)' }} />
         </div>
 
         {/* Damage / Heal */}

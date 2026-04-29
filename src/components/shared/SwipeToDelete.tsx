@@ -47,7 +47,7 @@ export default function SwipeToDelete({ onDelete, children, deleteLabel = 'Delet
           display: 'flex',
           width: `calc(100% + ${REVEAL}px)`,
           transform: `translateX(${offset}px)`,
-          transition: dragging ? 'none' : 'transform .2s ease',
+          transition: dragging ? 'none' : 'transform 220ms var(--ease-drawer)',
           willChange: 'transform',
         }}
         onTouchStart={handleTouchStart}
