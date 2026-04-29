@@ -1,13 +1,12 @@
 import { useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
+import PageTransition from '@/components/shared/PageTransition'
 
 type Mode = 'login' | 'signup' | 'magic'
 
 export default function AuthScreen() {
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
-  const role = searchParams.get('role')
 
   const [mode, setMode] = useState<Mode>('login')
   const [email, setEmail] = useState('')
@@ -15,7 +14,7 @@ export default function AuthScreen() {
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState<{ type: 'error' | 'success'; text: string } | null>(null)
 
-  const redirect = role === 'dm' ? '/dm' : '/characters'
+  const redirect = '/characters'
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -66,6 +65,7 @@ export default function AuthScreen() {
   }
 
   return (
+    <PageTransition>
     <div style={{ maxWidth: 400, margin: '0 auto', padding: '40px 16px' }}>
       <div
         style={{ display: 'flex', alignItems: 'center', marginBottom: 24, cursor: 'pointer', color: 'var(--text3)', fontSize: 14 }}
@@ -171,5 +171,6 @@ export default function AuthScreen() {
         </div>
       </div>
     </div>
+    </PageTransition>
   )
 }

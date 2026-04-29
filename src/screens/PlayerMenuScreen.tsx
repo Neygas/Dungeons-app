@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase'
 import type { Character, Session, LootItem, ShopItem, LootRarity } from '@/types'
 import { RARITY_COLORS, RARITY_LABELS } from '@/data/lootTemplates'
 import SwipeToDelete from '@/components/shared/SwipeToDelete'
+import PageTransition from '@/components/shared/PageTransition'
 
 function RarityBadge({ rarity }: { rarity?: LootRarity }) {
   if (!rarity) return null
@@ -183,12 +184,15 @@ export default function PlayerMenuScreen() {
   const getShopChar = () => shopModal ? characters.find(c => c.id === shopModal.charId) ?? null : null
 
   return (
+    <PageTransition>
     <div style={{ maxWidth: 600, margin: '0 auto', padding: '0 0 80px' }}>
       {/* Header */}
       <div style={{ background: 'var(--teal)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 16px', height: 48, position: 'sticky', top: 0, zIndex: 100 }}>
-        <button onClick={() => navigate('/')} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 14, fontWeight: 500, cursor: 'pointer', padding: '8px 4px' }}>← Home</button>
-        <span style={{ fontSize: 16, fontWeight: 600 }}>My Characters</span>
-        <button onClick={signOut} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 14, fontWeight: 500, cursor: 'pointer', padding: '8px 4px' }}>Sign out</button>
+        <span style={{ fontSize: 16, fontWeight: 600 }}>D&amp;D Companion</span>
+        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+          <button onClick={() => navigate('/dm')} style={{ background: 'rgba(255,255,255,.15)', border: '1px solid rgba(255,255,255,.3)', color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: '5px 10px', borderRadius: 3, fontFamily: 'inherit' }}>DM Mode →</button>
+          <button onClick={signOut} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,.7)', fontSize: 13, fontWeight: 500, cursor: 'pointer', padding: '8px 4px' }}>Sign out</button>
+        </div>
       </div>
 
       <div>
@@ -579,5 +583,6 @@ export default function PlayerMenuScreen() {
         )
       })()}
     </div>
+    </PageTransition>
   )
 }

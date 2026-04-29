@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/store/authStore'
 import { supabase } from '@/lib/supabase'
 import type { Session } from '@/types'
+import PageTransition from '@/components/shared/PageTransition'
 
 function generateCode() {
   const words = ['SWORD', 'FLAME', 'ROGUE', 'DRUID', 'OAKEN', 'STEEL', 'MAGIC', 'QUEST', 'BLADE', 'STORM']
@@ -78,11 +79,12 @@ export default function DMStartScreen() {
   }
 
   return (
+    <PageTransition direction="right">
     <div style={{ maxWidth: 600, margin: '0 auto', padding: '0 0 80px' }}>
       <div style={{ background: 'var(--teal)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 16px', height: 48, position: 'sticky', top: 0, zIndex: 100 }}>
-        <button onClick={() => navigate('/')} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 14, fontWeight: 500, cursor: 'pointer', padding: '8px 4px' }}>← Home</button>
+        <button onClick={() => navigate('/characters')} style={{ background: 'rgba(255,255,255,.15)', border: '1px solid rgba(255,255,255,.3)', color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: '5px 10px', borderRadius: 3, fontFamily: 'inherit' }}>← Player Mode</button>
         <span style={{ fontSize: 16, fontWeight: 600 }}>Dungeon Master</span>
-        <button onClick={signOut} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 14, fontWeight: 500, cursor: 'pointer', padding: '8px 4px' }}>Sign out</button>
+        <button onClick={signOut} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,.7)', fontSize: 13, fontWeight: 500, cursor: 'pointer', padding: '8px 4px' }}>Sign out</button>
       </div>
 
       <div style={{ padding: 16 }}>
@@ -146,5 +148,6 @@ export default function DMStartScreen() {
         </div>
       </div>
     </div>
+    </PageTransition>
   )
 }
