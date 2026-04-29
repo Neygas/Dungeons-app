@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import { AnimatePresence } from 'framer-motion'
 import { supabase, supabaseConfigured } from '@/lib/supabase'
 import { useAuthStore } from '@/store/authStore'
 import LandingScreen from '@/screens/LandingScreen'
@@ -35,6 +36,24 @@ VITE_SUPABASE_ANON_KEY=your_anon_key`}
   )
 }
 
+function AnimatedRoutes() {
+  const location = useLocation()
+  return (
+    <AnimatePresence mode="wait" initial={false}>
+      <Routes location={location} key={location.pathname}>
+        <Route path="/" element={<LandingScreen />} />
+        <Route path="/auth" element={<AuthScreen />} />
+        <Route path="/characters" element={<RequireAuth><PlayerMenuScreen /></RequireAuth>} />
+        <Route path="/characters/new" element={<RequireAuth><CharacterCreateScreen /></RequireAuth>} />
+        <Route path="/characters/:id" element={<RequireAuth><CharacterSheetScreen /></RequireAuth>} />
+        <Route path="/dm" element={<RequireAuth><DMStartScreen /></RequireAuth>} />
+        <Route path="/dm/:sessionId" element={<RequireAuth><DMDashboardScreen /></RequireAuth>} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </AnimatePresence>
+  )
+}
+
 export default function App() {
   const { setUser, setLoading } = useAuthStore()
 
@@ -55,16 +74,7 @@ export default function App() {
 
   return (
     <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<LandingScreen />} />
-        <Route path="/auth" element={<AuthScreen />} />
-        <Route path="/characters" element={<RequireAuth><PlayerMenuScreen /></RequireAuth>} />
-        <Route path="/characters/new" element={<RequireAuth><CharacterCreateScreen /></RequireAuth>} />
-        <Route path="/characters/:id" element={<RequireAuth><CharacterSheetScreen /></RequireAuth>} />
-        <Route path="/dm" element={<RequireAuth><DMStartScreen /></RequireAuth>} />
-        <Route path="/dm/:sessionId" element={<RequireAuth><DMDashboardScreen /></RequireAuth>} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+      <AnimatedRoutes />
     </BrowserRouter>
   )
 }
