@@ -200,7 +200,7 @@ export default function SpellsSection({ character: c }: Props) {
       {/* Add spell modal */}
       <AddModal open={showAddModal} onClose={() => setShowAddModal(false)} title="Add Spell">
         <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, background: 'var(--white)', zIndex: 2 }}>
-          <input autoFocus value={dbQuery} onChange={e => setDbQuery(e.target.value)} placeholder="Search spells..." style={{ width: '100%', border: '1px solid var(--border2)', padding: '9px 12px', fontSize: 15, fontFamily: 'inherit', color: 'var(--text)', borderRadius: 4, outline: 'none', background: 'var(--white)', boxSizing: 'border-box' }} />
+          <input value={dbQuery} onChange={e => setDbQuery(e.target.value)} placeholder="Search spells..." style={{ width: '100%', border: '1px solid var(--border2)', padding: '9px 12px', fontSize: 15, fontFamily: 'inherit', color: 'var(--text)', borderRadius: 4, outline: 'none', background: 'var(--white)', boxSizing: 'border-box' }} />
         </div>
         <div style={{ display: 'flex', gap: 6, padding: '8px 14px', borderBottom: '1px solid var(--border)', flexWrap: 'wrap', position: 'sticky', top: 57, background: 'var(--white)', zIndex: 2 }}>
           {['all', 0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(f => (

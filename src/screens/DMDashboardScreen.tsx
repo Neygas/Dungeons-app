@@ -988,7 +988,7 @@ export default function DMDashboardScreen() {
               <button onClick={() => setLootPickerOpen(false)} style={{ width: 30, height: 30, borderRadius: '50%', border: 'none', background: 'var(--bg)', cursor: 'pointer', fontSize: 16, color: 'var(--text2)' }}>✕</button>
             </div>
             <div style={{ padding: '10px 14px', flexShrink: 0 }}>
-              <input autoFocus value={lootPickerSearch} onChange={e => setLootPickerSearch(e.target.value)} placeholder="Search items..." style={{ width: '100%', border: '1px solid var(--border2)', padding: '8px 10px', fontSize: 14, fontFamily: 'inherit', borderRadius: 4, outline: 'none', color: 'var(--text)', background: 'var(--white)', boxSizing: 'border-box' }} />
+              <input value={lootPickerSearch} onChange={e => setLootPickerSearch(e.target.value)} placeholder="Search items..." style={{ width: '100%', border: '1px solid var(--border2)', padding: '8px 10px', fontSize: 14, fontFamily: 'inherit', borderRadius: 4, outline: 'none', color: 'var(--text)', background: 'var(--white)', boxSizing: 'border-box' }} />
             </div>
             <div style={{ display: 'flex', gap: 6, padding: '0 14px 10px', flexWrap: 'wrap', flexShrink: 0 }}>
               {['All', ...GEAR_CATEGORIES].map(cat => (
@@ -1083,7 +1083,7 @@ export default function DMDashboardScreen() {
               <button onClick={() => setShopPickerOpen(false)} style={{ width: 30, height: 30, borderRadius: '50%', border: 'none', background: 'var(--bg)', cursor: 'pointer', fontSize: 16, color: 'var(--text2)' }}>✕</button>
             </div>
             <div style={{ padding: '10px 14px', flexShrink: 0 }}>
-              <input autoFocus value={shopPickerSearch} onChange={e => setShopPickerSearch(e.target.value)} placeholder="Search items..." style={{ width: '100%', border: '1px solid var(--border2)', padding: '8px 10px', fontSize: 14, fontFamily: 'inherit', borderRadius: 4, outline: 'none', color: 'var(--text)', background: 'var(--white)', boxSizing: 'border-box' }} />
+              <input value={shopPickerSearch} onChange={e => setShopPickerSearch(e.target.value)} placeholder="Search items..." style={{ width: '100%', border: '1px solid var(--border2)', padding: '8px 10px', fontSize: 14, fontFamily: 'inherit', borderRadius: 4, outline: 'none', color: 'var(--text)', background: 'var(--white)', boxSizing: 'border-box' }} />
             </div>
             <div style={{ display: 'flex', gap: 6, padding: '0 14px 10px', flexWrap: 'wrap', flexShrink: 0 }}>
               {['All', ...GEAR_CATEGORIES].map(cat => (
