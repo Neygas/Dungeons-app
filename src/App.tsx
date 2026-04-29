@@ -11,6 +11,7 @@ import CharacterSheetScreen from '@/screens/CharacterSheetScreen'
 import CharacterCreateScreen from '@/screens/CharacterCreateScreen'
 import DMStartScreen from '@/screens/DMStartScreen'
 import DMDashboardScreen from '@/screens/DMDashboardScreen'
+import SettingsScreen from '@/screens/SettingsScreen'
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuthStore()
@@ -49,6 +50,7 @@ function AnimatedRoutes() {
         <Route path="/characters/:id" element={<RequireAuth><CharacterSheetScreen /></RequireAuth>} />
         <Route path="/dm" element={<RequireAuth><DMStartScreen /></RequireAuth>} />
         <Route path="/dm/:sessionId" element={<RequireAuth><DMDashboardScreen /></RequireAuth>} />
+        <Route path="/settings" element={<RequireAuth><SettingsScreen /></RequireAuth>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </AnimatePresence>

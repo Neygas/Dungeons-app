@@ -89,7 +89,7 @@ function CharacterCard({ character, sessionCode, onClick, onLeave, onDelete }: {
 
 export default function PlayerMenuScreen() {
   const navigate = useNavigate()
-  const { user, signOut } = useAuthStore()
+  const { user } = useAuthStore()
   const { characters, loading, fetchCharacters, deleteCharacter } = useCharacterStore()
   const { joinSession, leaveSession, getJoinedSession, confirmLootClaims, purchaseItem } = useSessionStore()
 
@@ -191,7 +191,7 @@ export default function PlayerMenuScreen() {
         <span style={{ fontSize: 16, fontWeight: 600 }}>D&amp;D Companion</span>
         <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
           <button onClick={() => navigate('/dm')} style={{ background: 'rgba(255,255,255,.15)', border: '1px solid rgba(255,255,255,.3)', color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: '5px 10px', borderRadius: 3, fontFamily: 'inherit' }}>DM Mode →</button>
-          <button onClick={signOut} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,.7)', fontSize: 13, fontWeight: 500, cursor: 'pointer', padding: '8px 4px' }}>Sign out</button>
+          <button onClick={() => navigate('/settings')} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,.7)', fontSize: 18, cursor: 'pointer', padding: '8px 4px', lineHeight: 1 }}>⚙️</button>
         </div>
       </div>
 
