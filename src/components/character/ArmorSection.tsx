@@ -129,8 +129,8 @@ export default function ArmorSection({ character: c }: Props) {
 
       {/* Armor detail popup */}
       {openArmor && (
-        <div onClick={e => { if (e.target === e.currentTarget) setOpenArmor(null) }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 300, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
-          <div style={{ background: 'var(--white)', width: '100%', maxWidth: 600, borderRadius: '14px 14px 0 0', padding: '20px 16px 32px' }}>
+        <div onClick={e => { if (e.target === e.currentTarget) setOpenArmor(null) }} className="sheet-backdrop" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 300, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+          <div className="sheet-panel" style={{ background: 'var(--white)', width: '100%', maxWidth: 600, borderRadius: '14px 14px 0 0', padding: '20px 16px 32px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
               <div style={{ fontSize: 20, fontWeight: 700 }}>{openArmor.name}</div>
               <button onClick={() => setOpenArmor(null)} style={{ width: 30, height: 30, borderRadius: '50%', border: 'none', background: 'var(--bg)', cursor: 'pointer', fontSize: 16, color: 'var(--text2)' }}>✕</button>

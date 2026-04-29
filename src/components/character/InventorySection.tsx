@@ -149,8 +149,8 @@ export default function InventorySection({ character: c }: Props) {
 
       {/* Use item modal */}
       {useItem && (
-        <div onClick={e => { if (e.target === e.currentTarget) setUseItem(null) }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-          <div style={{ background: 'var(--white)', borderRadius: 10, width: '100%', maxWidth: 320, padding: 20 }}>
+        <div onClick={e => { if (e.target === e.currentTarget) setUseItem(null) }} className="modal-backdrop" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+          <div className="modal-panel" style={{ background: 'var(--white)', borderRadius: 10, width: '100%', maxWidth: 320, padding: 20 }}>
             <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>Use {useItem.name}</div>
             <div style={{ fontSize: 13, color: 'var(--text3)', marginBottom: 16 }}>You have {useItem.quantity}. How many do you want to use?</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>

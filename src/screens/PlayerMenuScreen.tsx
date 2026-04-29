@@ -499,8 +499,8 @@ export default function PlayerMenuScreen() {
         const char = characters.find(c => c.id === confirmDeleteId)
         if (!char) return null
         return (
-          <div onClick={() => setConfirmDeleteId(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-            <div onClick={e => e.stopPropagation()} style={{ background: 'var(--white)', borderRadius: 10, width: '100%', maxWidth: 340, padding: 22 }}>
+          <div onClick={() => setConfirmDeleteId(null)} className="modal-backdrop" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+            <div onClick={e => e.stopPropagation()} className="modal-panel" style={{ background: 'var(--white)', borderRadius: 10, width: '100%', maxWidth: 340, padding: 22 }}>
               <div style={{ fontSize: 17, fontWeight: 700, marginBottom: 8 }}>Delete character?</div>
               <div style={{ fontSize: 14, color: 'var(--text2)', marginBottom: 20 }}>
                 <strong>{char.name}</strong> will be permanently deleted. This cannot be undone.

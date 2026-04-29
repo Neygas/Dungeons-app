@@ -15,6 +15,7 @@ export default function SwipeToDelete({ onDelete, children, deleteLabel = 'Delet
   const offsetRef = useRef(0)
   const startX = useRef(0)
   const startOff = useRef(0)
+  const startTime = useRef(0)
   const moved = useRef(false)
 
   const setOffset = (v: number) => {
@@ -25,6 +26,7 @@ export default function SwipeToDelete({ onDelete, children, deleteLabel = 'Delet
   const handleTouchStart = (e: React.TouchEvent) => {
     startX.current = e.touches[0].clientX
     startOff.current = offsetRef.current
+    startTime.current = Date.now()
     moved.current = false
     setDragging(true)
   }
@@ -37,7 +39,8 @@ export default function SwipeToDelete({ onDelete, children, deleteLabel = 'Delet
 
   const handleTouchEnd = () => {
     setDragging(false)
-    setOffset(offsetRef.current < -THRESHOLD ? -REVEAL : 0)
+    const velocity = Math.abs(offsetRef.current) / Math.max(1, Date.now() - startTime.current)
+    setOffset(velocity > 0.3 || offsetRef.current < -THRESHOLD ? -REVEAL : 0)
   }
 
   return (

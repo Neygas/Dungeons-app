@@ -51,3 +51,28 @@ button:active {
   transform: scale(0.97);
 }
 
+.sheet-backdrop {
+  opacity: 1;
+  transition: opacity 250ms var(--ease-out);
+  @starting-style { opacity: 0; }
+}
+
+.sheet-panel {
+  transform: translateY(0);
+  transition: transform 320ms var(--ease-drawer);
+  @starting-style { transform: translateY(100%); }
+}
+
+.modal-backdrop {
+  opacity: 1;
+  transition: opacity 200ms var(--ease-out);
+  @starting-style { opacity: 0; }
+}
+
+.modal-panel {
+  transform: scale(1);
+  opacity: 1;
+  transition: transform 200ms var(--ease-out), opacity 200ms var(--ease-out);
+  @starting-style { transform: scale(0.95); opacity: 0; }
+}
+

@@ -240,8 +240,8 @@ function SpellDetail({ spell, character: _c, onClose, onCast, onRemove, slots, s
   const availableSlots = slots.map((total, i) => ({ level: i + 1, remaining: total - (slotsUsed[i] ?? 0) })).filter(s => s.level >= spell.level && s.remaining > 0)
 
   return (
-    <div onClick={e => { if (e.target === e.currentTarget) onClose() }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 200, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
-      <div style={{ background: 'var(--white)', width: '100%', maxWidth: 600, maxHeight: '85vh', borderRadius: '14px 14px 0 0', overflowY: 'auto', padding: '20px 16px 32px' }}>
+    <div onClick={e => { if (e.target === e.currentTarget) onClose() }} className="sheet-backdrop" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 200, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+      <div className="sheet-panel" style={{ background: 'var(--white)', width: '100%', maxWidth: 600, maxHeight: '85vh', borderRadius: '14px 14px 0 0', overflowY: 'auto', padding: '20px 16px 32px' }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 4 }}>
           <div>
             <div style={{ fontSize: 20, fontWeight: 700 }}>{spell.name}</div>
