@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useSessionStore } from '@/store/sessionStore'
+import { useUIStore } from '@/store/uiStore'
+import { haptic } from '@/utils/haptics'
 import { CONDITIONS } from '@/data/conditions'
 import { GEAR_DB, GEAR_CATEGORIES } from '@/data/gear'
 import { PREMADE_LOOT_POOLS, RARITY_COLORS, RARITY_LABELS, type LootTemplate } from '@/data/lootTemplates'
@@ -330,6 +332,7 @@ export default function DMDashboardScreen() {
     loadSession, subscribeAll, unsubscribeAll,
     patchSession, setInitiative, nextTurn, clearLog,
   } = useSessionStore()
+  const { showCutscene } = useUIStore()
 
   const [tab, setTab] = useState<Tab>('players')
   const [detailChar, setDetailChar] = useState<Character | null>(null)
@@ -425,6 +428,8 @@ export default function DMDashboardScreen() {
     const all = [...playerEntries, ...enemyEntries].sort((a, b) => b.initiative - a.initiative)
     setInitiative(all)
     patchSession({ combat_active: true })
+    haptic.combatStart()
+    showCutscene('combat-start')
   }
 
   const addEnemy = () => {
@@ -635,7 +640,7 @@ export default function DMDashboardScreen() {
             <div style={{ display: 'flex', gap: 8 }}>
               {s.combat_active && (
                 <button
-                  onClick={nextTurn}
+                  onClick={() => { haptic.medium(); nextTurn() }}
                   style={{ padding: '5px 12px', background: 'var(--teal)', color: '#fff', border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer', borderRadius: 2, fontFamily: 'inherit' }}
                 >
                   Next Turn

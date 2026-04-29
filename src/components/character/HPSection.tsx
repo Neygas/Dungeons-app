@@ -4,6 +4,7 @@ import { hpColor } from '@/lib/calculations'
 import { useCharacterStore } from '@/store/characterStore'
 import { useUIStore } from '@/store/uiStore'
 import { useLongPress } from '@/lib/useLongPress'
+import { haptic } from '@/utils/haptics'
 import { CONDITIONS } from '@/data'
 
 interface Props { character: Character }
@@ -38,6 +39,7 @@ export default function HPSection({ character: c }: Props) {
   const applyDamage = async () => {
     const n = parseInt(adjVal)
     if (!n || n <= 0) return
+    haptic.damage()
     showToast(`-${n} HP`)
     setAdjVal('')
     const newHp = Math.max(0, c.hp - n)
@@ -55,6 +57,7 @@ export default function HPSection({ character: c }: Props) {
   const applyHeal = async () => {
     const n = parseInt(adjVal)
     if (!n || n <= 0) return
+    haptic.heal()
     showToast(`+${n} HP`)
     setAdjVal('')
     await patchActiveCharacter({ hp: Math.min(c.max_hp + (c.temp_hp ?? 0), c.hp + n) })
@@ -238,7 +241,7 @@ export function TempHPSheet({ character: c }: Props) {
 // ===== Rest Sheet =====
 export function RestSheet({ character: c }: Props) {
   const { patchActiveCharacter } = useCharacterStore()
-  const { showToast, closeSheet } = useUIStore()
+  const { showToast, closeSheet, showCutscene } = useUIStore()
   const [hdMode, setHdMode] = useState<'avg' | 'roll' | 'manual'>('avg')
   const [hdManual, setHdManual] = useState('')
 
@@ -255,6 +258,8 @@ export function RestSheet({ character: c }: Props) {
     await patchActiveCharacter({ hp: Math.min(c.max_hp, c.hp + Math.max(0, gain)), hit_dice_used: c.hit_dice_used + 1 })
     showToast(`Short rest: +${Math.max(0, gain)} HP`)
     closeSheet()
+    haptic.shortRest()
+    showCutscene('short-rest')
   }
 
   const longRest = async () => {
@@ -265,6 +270,8 @@ export function RestSheet({ character: c }: Props) {
     })
     showToast('Long rest complete — fully restored')
     closeSheet()
+    haptic.longRest()
+    showCutscene('long-rest')
   }
 
   return (

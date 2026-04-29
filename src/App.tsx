@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-route
 import { AnimatePresence } from 'framer-motion'
 import { supabase, supabaseConfigured } from '@/lib/supabase'
 import { useAuthStore } from '@/store/authStore'
+import CutsceneOverlay from '@/components/shared/CutsceneOverlay'
 import LandingScreen from '@/screens/LandingScreen'
 import AuthScreen from '@/screens/AuthScreen'
 import PlayerMenuScreen from '@/screens/PlayerMenuScreen'
@@ -75,6 +76,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <AnimatedRoutes />
+      <CutsceneOverlay />
     </BrowserRouter>
   )
 }

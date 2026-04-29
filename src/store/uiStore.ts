@@ -5,22 +5,36 @@ interface Toast {
   message: string
 }
 
+export type CutsceneType = 'combat-start' | 'short-rest' | 'long-rest' | 'level-up'
+
+interface Cutscene {
+  type: CutsceneType
+  key: number
+  data?: Record<string, unknown>
+}
+
 interface UIState {
   toasts: Toast[]
   editMode: boolean
   activeSheet: 'info' | 'exp' | 'quickref' | 'conditions' | 'tempHp' | 'rest' | null
+  cutscene: Cutscene | null
+
   showToast: (message: string) => void
   setEditMode: (v: boolean) => void
   openSheet: (sheet: UIState['activeSheet']) => void
   closeSheet: () => void
+  showCutscene: (type: CutsceneType, data?: Record<string, unknown>) => void
+  dismissCutscene: () => void
 }
 
 let toastId = 0
+let cutsceneKey = 0
 
 export const useUIStore = create<UIState>((set) => ({
   toasts: [],
   editMode: false,
   activeSheet: null,
+  cutscene: null,
 
   showToast: (message) => {
     const id = ++toastId
@@ -31,4 +45,7 @@ export const useUIStore = create<UIState>((set) => ({
   setEditMode: (v) => set({ editMode: v }),
   openSheet: (sheet) => set({ activeSheet: sheet }),
   closeSheet: () => set({ activeSheet: null }),
+
+  showCutscene: (type, data) => set({ cutscene: { type, key: ++cutsceneKey, data } }),
+  dismissCutscene: () => set({ cutscene: null }),
 }))

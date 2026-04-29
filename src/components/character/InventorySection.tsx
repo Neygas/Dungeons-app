@@ -4,6 +4,7 @@ import { GEAR_DB, GEAR_CATEGORIES } from '@/data'
 import { useCharacterStore } from '@/store/characterStore'
 import { useUIStore } from '@/store/uiStore'
 import { useSessionStore } from '@/store/sessionStore'
+import { haptic } from '@/utils/haptics'
 import AddModal from '@/components/shared/AddModal'
 import SwipeToDelete from '@/components/shared/SwipeToDelete'
 import { useLongPress } from '@/lib/useLongPress'
@@ -94,6 +95,7 @@ export default function InventorySection({ character: c }: Props) {
     if (!useItem) return
     const qty = Math.max(1, parseInt(useQty) || 1)
     const clamped = Math.min(qty, useItem.quantity)
+    haptic.itemUse()
     await adjustQty(useItem.name, -clamped)
     const sid = getJoinedSession(c.id)
     if (sid) await logEntry(sid, c.name, 'item_use', `${c.name} used ${clamped}× ${useItem.name}`, { quantity: clamped }, c.id)

@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { AnimatePresence, motion } from 'framer-motion'
 import { useCharacterStore } from '@/store/characterStore'
 import { useAuthStore } from '@/store/authStore'
 import { useUIStore } from '@/store/uiStore'
 import { useSessionStore } from '@/store/sessionStore'
 import { saveBonus } from '@/lib/calculations'
+import { haptic } from '@/utils/haptics'
 import HPSection, { ConditionsSheet, TempHPSheet, RestSheet } from '@/components/character/HPSection'
 import CombatStats from '@/components/character/CombatStats'
 import AbilityScores from '@/components/character/AbilityScores'
@@ -57,10 +59,12 @@ export default function CharacterSheetScreen() {
   const [showConSave, setShowConSave] = useState(false)
   const [conSaveDC, setConSaveDC] = useState(10)
   const [conSaveDamage, setConSaveDamage] = useState(0)
+  const [showYourTurnBanner, setShowYourTurnBanner] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const lastScrollY = useRef(0)
   const prevHpRef = useRef<number | null>(null)
   const prevIsTurnRef = useRef(false)
+  const yourTurnTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     if (user && characters.length === 0) fetchCharacters(user.id)
@@ -120,6 +124,10 @@ export default function CharacterSheetScreen() {
         for (const f of roundFeatures) newUses[f.key] = 0
         useCharacterStore.getState().patchActiveCharacter({ feature_uses: newUses })
       }
+      haptic.yourTurn()
+      setShowYourTurnBanner(true)
+      if (yourTurnTimerRef.current) clearTimeout(yourTurnTimerRef.current)
+      yourTurnTimerRef.current = setTimeout(() => setShowYourTurnBanner(false), 2800)
     }
     prevIsTurnRef.current = isMyTurn
   }, [activeSession?.current_turn, activeSession?.combat_active]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -162,6 +170,30 @@ export default function CharacterSheetScreen() {
 
   return (
     <div ref={scrollRef} style={{ maxWidth: 600, margin: '0 auto', paddingBottom: 80, height: '100vh', overflowY: 'auto' }}>
+      {/* Your Turn banner */}
+      <AnimatePresence>
+        {showYourTurnBanner && (
+          <motion.div
+            initial={{ y: -72, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: -72, opacity: 0 }}
+            transition={{ duration: 0.35, ease: [0.25, 0.46, 0.45, 0.94] as [number, number, number, number] }}
+            style={{
+              position: 'fixed', top: 0, left: 0, right: 0, zIndex: 999,
+              background: 'var(--teal)', color: '#fff',
+              padding: '14px 20px',
+              textAlign: 'center',
+              fontSize: 18, fontWeight: 800,
+              letterSpacing: 1,
+              pointerEvents: 'none',
+              boxShadow: '0 4px 20px rgba(0,0,0,.25)',
+            }}
+          >
+            ⚔️ YOUR TURN
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Sticky header */}
       <div style={{ position: 'sticky', top: 0, zIndex: 100, background: 'var(--teal)' }}>
 

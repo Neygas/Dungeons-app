@@ -1,4 +1,5 @@
 import { useCallback, useRef } from 'react'
+import { haptic } from '@/utils/haptics'
 
 export function useLongPress(callback: () => void, ms = 600) {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -9,6 +10,7 @@ export function useLongPress(callback: () => void, ms = 600) {
     triggered.current = false
     timerRef.current = setTimeout(() => {
       triggered.current = true
+      haptic.light()
       callback()
     }, ms)
   }, [callback, ms])

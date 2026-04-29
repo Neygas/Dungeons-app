@@ -4,6 +4,7 @@ import { RACES, CLASSES, BACKGROUNDS, LEVEL_UP_FEATURES, XP_TABLE, CLASS_HD, SPE
 import { mod, profBonus, averageHpGain, rollDie } from '@/lib/calculations'
 import { useCharacterStore } from '@/store/characterStore'
 import { useUIStore } from '@/store/uiStore'
+import { haptic } from '@/utils/haptics'
 
 interface Props {
   character: Character
@@ -65,7 +66,7 @@ type LevelUpPhase = 'class' | 'subclass' | 'asi' | 'hp' | 'done'
 
 function LevelUpModal({ character: c, onClose }: { character: Character; onClose: () => void }) {
   const { patchActiveCharacter } = useCharacterStore()
-  const { showToast } = useUIStore()
+  const { showToast, showCutscene } = useUIStore()
 
   const existingClasses = c.classes ?? [{ name: c.class, level: c.level }]
 
@@ -176,6 +177,8 @@ function LevelUpModal({ character: c, onClose }: { character: Character; onClose
 
     await patchActiveCharacter(updates as Partial<Character>)
     showToast(`Level ${newTotalLevel}! +${hpGain} HP`)
+    haptic.levelUp()
+    showCutscene('level-up', { level: newTotalLevel })
     setPhase('done')
   }
 
