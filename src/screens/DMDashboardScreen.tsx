@@ -34,6 +34,15 @@ function RarityBadge({ rarity }: { rarity?: LootRarity }) {
 
 type Tab = 'players' | 'initiative' | 'log' | 'loot' | 'shop' | 'notes'
 
+interface StagingEntry {
+  id: string
+  name: string
+  hp: number
+  ac?: number
+  attacks?: CreatureAttack[]
+  isNpc?: boolean
+}
+
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 const LOG_COLORS: Record<string, string> = {
@@ -245,38 +254,74 @@ function PlayerCard({ char, sessionId, isTurn }: { char: Character; sessionId: s
 
 // ── Initiative Row ─────────────────────────────────────────────────────────────
 
-function InitEntryRow({ entry, idx, isCurrent, chars, onHpChange, onRemove }: {
+function InitEntryRow({ entry, idx, isCurrent, chars, onHpDelta, onRemove, onToggleCondition, onNpcDeathSave }: {
   entry: InitiativeEntry
   idx: number
   isCurrent: boolean
   chars: Character[]
-  onHpChange: (idx: number, newHp: number) => void
+  onHpDelta: (idx: number, delta: number) => void
   onRemove: (idx: number) => void
+  onToggleCondition: (idx: number, cond: string) => void
+  onNpcDeathSave: (idx: number, type: 'success' | 'failure') => void
 }) {
+  const { dmPatchCharacter, logEntry, activeSession } = useSessionStore()
+  const [hpInput, setHpInput] = useState('')
+  const [showCond, setShowCond] = useState(false)
   const [showAttacks, setShowAttacks] = useState(false)
+
   const char = entry.characterId ? chars.find(c => c.id === entry.characterId) : null
   const hp = char ? char.hp : (entry.hp ?? 0)
   const maxHp = char ? char.max_hp : (entry.maxHp ?? 1)
   const pct = maxHp > 0 ? hp / maxHp : 0
+  const isDead = !!entry.is_dead
+  const isDying = !!entry.isNpc && hp <= 0 && !entry.is_dead && !entry.is_stable
   const attacks = entry.attacks ?? []
+  const conditions = entry.isPlayer ? (char?.conditions ?? []) : (entry.conditions ?? [])
+
+  const applyDelta = (sign: 1 | -1) => {
+    const num = Math.max(1, parseInt(hpInput) || 1)
+    onHpDelta(idx, sign * num)
+    setHpInput('')
+  }
+
+  const togglePlayerCondition = async (cond: string) => {
+    if (!char || !activeSession) return
+    const current = char.conditions ?? []
+    const next = current.includes(cond) ? current.filter(c => c !== cond) : [...current, cond]
+    await dmPatchCharacter(char.id, { conditions: next })
+    await logEntry(activeSession.id, char.name, 'condition', `${char.name} ${next.includes(cond) ? 'gained' : 'lost'} ${cond}`, {}, char.id)
+  }
 
   return (
     <div style={{
-      background: isCurrent ? 'var(--teal-light)' : 'var(--white)',
+      background: isDead ? 'var(--bg)' : (isCurrent ? 'var(--teal-light)' : 'var(--white)'),
       border: `1px solid ${isCurrent ? 'var(--teal)' : 'var(--border)'}`,
       borderTop: 'none', transition: 'all .2s',
+      opacity: isDead ? 0.5 : 1,
     }}>
+      {/* Main row */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px' }}>
-        <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--teal2)', width: 28, textAlign: 'center', flexShrink: 0 }}>{entry.initiative}</span>
+        <span style={{ fontSize: 16, fontWeight: 700, color: isDead ? 'var(--text3)' : 'var(--teal2)', width: 28, textAlign: 'center', flexShrink: 0 }}>{entry.initiative}</span>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ fontSize: 13, fontWeight: 600 }}>{entry.name}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: isDead ? 'var(--text3)' : 'var(--text)', textDecoration: isDead ? 'line-through' : 'none' }}>{entry.name}</span>
+            {entry.isNpc && !isDead && <span style={{ fontSize: 9, fontWeight: 700, color: '#fff', background: '#6b7280', padding: '1px 4px', borderRadius: 2, textTransform: 'uppercase', letterSpacing: .3 }}>NPC</span>}
+            {isDead && <span style={{ fontSize: 9, fontWeight: 700, color: '#fff', background: 'var(--red)', padding: '1px 4px', borderRadius: 2, textTransform: 'uppercase', letterSpacing: .3 }}>DEAD</span>}
+            {entry.is_stable && !isDead && <span style={{ fontSize: 9, fontWeight: 700, color: '#fff', background: 'var(--green)', padding: '1px 4px', borderRadius: 2, textTransform: 'uppercase', letterSpacing: .3 }}>STABLE</span>}
             {entry.ac != null && <span style={{ fontSize: 10, color: 'var(--text3)', fontWeight: 600 }}>AC {entry.ac}</span>}
           </div>
           <div style={{ background: 'var(--border)', height: 3, borderRadius: 2, marginTop: 3 }}>
-            <div style={{ height: 3, borderRadius: 2, background: hpColor(pct), width: `${Math.max(0, Math.min(100, pct * 100))}%` }} />
+            <div style={{ height: 3, borderRadius: 2, background: isDead ? 'var(--text3)' : hpColor(pct), width: `${Math.max(0, Math.min(100, pct * 100))}%` }} />
           </div>
+          {conditions.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginTop: 4 }}>
+              {conditions.map(cond => (
+                <span key={cond} style={{ fontSize: 9, background: '#fef3c7', color: '#92400e', padding: '1px 4px', borderRadius: 2, fontWeight: 600 }}>{cond}</span>
+              ))}
+            </div>
+          )}
         </div>
+        <span style={{ fontSize: 12, fontWeight: 700, color: isDead ? 'var(--text3)' : hpColor(pct), flexShrink: 0 }}>{hp}/{maxHp}</span>
         {attacks.length > 0 && (
           <button
             onClick={() => setShowAttacks(v => !v)}
@@ -285,24 +330,15 @@ function InitEntryRow({ entry, idx, isCurrent, chars, onHpChange, onRemove }: {
             ⚔ {showAttacks ? 'Hide' : 'Atk'}
           </button>
         )}
-        {!entry.isPlayer ? (
-          <>
-            <input
-              type="number"
-              defaultValue={hp}
-              onBlur={e => onHpChange(idx, parseInt(e.target.value) || 0)}
-              style={{ width: 44, border: 'none', borderBottom: '1px solid var(--border2)', background: 'transparent', textAlign: 'center', fontSize: 13, fontFamily: 'inherit', outline: 'none', padding: '1px 2px', color: hpColor(pct) }}
-            />
-            <span style={{ fontSize: 11, color: 'var(--text3)' }}>/{maxHp}</span>
-            <button onClick={() => onRemove(idx)} style={{ background: 'none', border: 'none', color: 'var(--red)', cursor: 'pointer', fontSize: 14, padding: '0 2px', fontFamily: 'inherit' }}>✕</button>
-          </>
-        ) : (
-          <span style={{ fontSize: 13, fontWeight: 700, color: hpColor(pct) }}>{hp}/{maxHp}</span>
-        )}
         {isCurrent && (
           <span style={{ fontSize: 9, fontWeight: 700, color: '#fff', background: 'var(--teal)', padding: '2px 5px', borderRadius: 2, letterSpacing: .5, textTransform: 'uppercase' }}>TURN</span>
         )}
+        {!entry.isPlayer && (
+          <button onClick={() => onRemove(idx)} style={{ background: 'none', border: 'none', color: 'var(--red)', cursor: 'pointer', fontSize: 14, padding: '0 2px', fontFamily: 'inherit' }}>✕</button>
+        )}
       </div>
+
+      {/* Attacks panel */}
       {showAttacks && attacks.length > 0 && (
         <div style={{ padding: '0 12px 10px 48px', display: 'flex', flexDirection: 'column', gap: 4 }}>
           {attacks.map((atk, i) => (
@@ -316,6 +352,84 @@ function InitEntryRow({ entry, idx, isCurrent, chars, onHpChange, onRemove }: {
               )}
             </div>
           ))}
+        </div>
+      )}
+
+      {/* HP adjust (non-player entries, always shown so dead entries can be healed/revived) */}
+      {!entry.isPlayer && (
+        <div style={{ padding: '0 12px 8px', display: 'flex', gap: 6, alignItems: 'center' }}>
+          <button
+            onClick={() => applyDelta(-1)}
+            style={{ width: 28, height: 28, background: 'var(--red)', border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 15, borderRadius: 2, fontFamily: 'inherit', color: '#fff', flexShrink: 0 }}
+          >−</button>
+          <input
+            value={hpInput}
+            onChange={e => setHpInput(e.target.value)}
+            placeholder="HP"
+            type="number"
+            style={{ flex: 1, border: 'none', borderBottom: '1px solid var(--border2)', background: 'transparent', textAlign: 'center', fontSize: 13, fontFamily: 'inherit', outline: 'none', color: 'var(--text)' }}
+          />
+          <button
+            onClick={() => applyDelta(1)}
+            style={{ width: 28, height: 28, background: 'var(--green)', border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 15, borderRadius: 2, fontFamily: 'inherit', color: '#fff', flexShrink: 0 }}
+          >+</button>
+          <button
+            onClick={() => setShowCond(!showCond)}
+            style={{ padding: '4px 8px', background: showCond ? '#fef3c7' : 'var(--border)', color: showCond ? '#92400e' : 'var(--text2)', border: 'none', fontSize: 11, fontWeight: 600, cursor: 'pointer', borderRadius: 2, fontFamily: 'inherit', flexShrink: 0 }}
+          >Cond</button>
+        </div>
+      )}
+
+      {/* Condition toggle button for players */}
+      {entry.isPlayer && (
+        <div style={{ padding: '0 12px 6px' }}>
+          <button
+            onClick={() => setShowCond(!showCond)}
+            style={{ fontSize: 11, color: 'var(--teal)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}
+          >
+            {showCond ? 'Hide conditions ▲' : 'Edit conditions ▼'}
+          </button>
+        </div>
+      )}
+
+      {/* Condition picker */}
+      {showCond && (
+        <div style={{ padding: '4px 12px 10px' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+            {CONDITIONS.map(cond => {
+              const active = conditions.includes(cond)
+              return (
+                <button
+                  key={cond}
+                  onClick={() => entry.isPlayer ? togglePlayerCondition(cond) : onToggleCondition(idx, cond)}
+                  style={{ fontSize: 10, padding: '3px 7px', borderRadius: 3, border: `1px solid ${active ? '#92400e' : 'var(--border2)'}`, background: active ? '#fef3c7' : 'var(--white)', color: active ? '#92400e' : 'var(--text2)', cursor: 'pointer', fontFamily: 'inherit', fontWeight: active ? 700 : 400 }}
+                >
+                  {cond}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* NPC death saves */}
+      {isDying && (
+        <div style={{ padding: '4px 12px 10px', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 11, color: 'var(--red)', fontWeight: 700 }}>Saving throws:</span>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            <span style={{ fontSize: 12 }}>S: {'●'.repeat(entry.death_successes ?? 0)}{'○'.repeat(3 - (entry.death_successes ?? 0))}</span>
+            <button
+              onClick={() => onNpcDeathSave(idx, 'success')}
+              style={{ padding: '2px 8px', background: 'var(--green)', color: '#fff', border: 'none', fontSize: 11, fontWeight: 700, cursor: 'pointer', borderRadius: 2, fontFamily: 'inherit' }}
+            >✓</button>
+          </div>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            <span style={{ fontSize: 12 }}>F: {'●'.repeat(entry.death_failures ?? 0)}{'○'.repeat(3 - (entry.death_failures ?? 0))}</span>
+            <button
+              onClick={() => onNpcDeathSave(idx, 'failure')}
+              style={{ padding: '2px 8px', background: 'var(--red)', color: '#fff', border: 'none', fontSize: 11, fontWeight: 700, cursor: 'pointer', borderRadius: 2, fontFamily: 'inherit' }}
+            >✗</button>
+          </div>
         </div>
       )}
     </div>
@@ -345,9 +459,14 @@ export default function DMDashboardScreen() {
   const [enemyInit, setEnemyInit] = useState('')
 
   // Enemy add mode
-  const [enemyMode, setEnemyMode] = useState<'custom' | 'db'>('custom')
+  const [enemyMode, setEnemyMode] = useState<'custom' | 'db'>('db')
   const [enemyDbSearch, setEnemyDbSearch] = useState('')
   const [pendingAttacks, setPendingAttacks] = useState<CreatureAttack[]>([])
+  const [isNpcToggle, setIsNpcToggle] = useState(false)
+  const [creatureFilter, setCreatureFilter] = useState<'all' | 'enemy' | 'npc'>('all')
+
+  // Pre-combat staging list
+  const [stagingList, setStagingList] = useState<StagingEntry[]>([])
 
   // Custom attack builder
   const [atkName, setAtkName] = useState('')
@@ -424,32 +543,60 @@ export default function DMDashboardScreen() {
       hp: c.hp,
       maxHp: c.max_hp,
     }))
-    const enemyEntries = s.initiative.filter(e => !e.isPlayer)
-    const all = [...playerEntries, ...enemyEntries].sort((a, b) => b.initiative - a.initiative)
+    const creatureEntries: InitiativeEntry[] = stagingList.map(e => ({
+      id: e.id,
+      name: e.name,
+      initiative: Math.floor(Math.random() * 20) + 1,
+      isPlayer: false,
+      isNpc: e.isNpc,
+      hp: e.hp,
+      maxHp: e.hp,
+      ac: e.ac,
+      attacks: e.attacks,
+    }))
+    const all = [...playerEntries, ...creatureEntries].sort((a, b) => b.initiative - a.initiative)
     setInitiative(all)
     patchSession({ combat_active: true })
+    setStagingList([])
     haptic.combatStart()
     showCutscene('combat-start')
   }
 
-  const addEnemy = () => {
+  const stageCreature = () => {
+    if (!enemyName.trim()) return
+    const entry: StagingEntry = {
+      id: `staged-${Date.now()}`,
+      name: enemyName.trim(),
+      hp: parseInt(enemyHp) || 10,
+      ac: parseInt(enemyAc) || undefined,
+      attacks: pendingAttacks.length > 0 ? [...pendingAttacks] : undefined,
+      isNpc: isNpcToggle,
+    }
+    setStagingList(p => [...p, entry])
+    setEnemyName(''); setEnemyHp(''); setEnemyAc(''); setEnemyInit('')
+    setPendingAttacks([])
+    setIsNpcToggle(false)
+  }
+
+  const addCreatureToCombat = () => {
     if (!enemyName.trim()) return
     const hp = parseInt(enemyHp) || 10
-    const ac = parseInt(enemyAc) || undefined
     const newEntry: InitiativeEntry = {
       id: `enemy-${Date.now()}`,
       name: enemyName.trim(),
-      initiative: parseInt(enemyInit) || 0,
+      initiative: parseInt(enemyInit) || Math.floor(Math.random() * 20) + 1,
       isPlayer: false,
+      isNpc: isNpcToggle,
       hp,
       maxHp: hp,
-      ac,
+      ac: parseInt(enemyAc) || undefined,
       attacks: pendingAttacks.length > 0 ? [...pendingAttacks] : undefined,
     }
     const updated = [...s.initiative, newEntry].sort((a, b) => b.initiative - a.initiative)
-    setInitiative(updated)
+    patchSession({ initiative: updated })
     setEnemyName(''); setEnemyHp(''); setEnemyAc(''); setEnemyInit('')
     setPendingAttacks([])
+    setIsNpcToggle(false)
   }
 
   const addCustomAttack = () => {
@@ -466,9 +613,40 @@ export default function DMDashboardScreen() {
     setAtkHasSave(false); setAtkSaveDc(''); setAtkSaveEffect('')
   }
 
-  const updateEnemyHp = (idx: number, newHp: number) => {
-    const updated = s.initiative.map((e, i) => i === idx ? { ...e, hp: newHp } : e)
-    patchSession({ initiative: updated })
+  const updateEntryHpDelta = (idx: number, delta: number) => {
+    const entry = s.initiative[idx]
+    if (!entry) return
+    const currentHp = entry.hp ?? 0
+    const maxHp = entry.maxHp ?? 1
+    const newHp = Math.max(0, Math.min(maxHp, currentHp + delta))
+    const updates: Partial<InitiativeEntry> = { hp: newHp }
+    if (newHp === 0 && !entry.isNpc) updates.is_dead = true
+    if (entry.isNpc && newHp > 0 && entry.is_dead) {
+      updates.is_dead = false
+      updates.death_successes = 0
+      updates.death_failures = 0
+      updates.is_stable = false
+    }
+    patchSession({ initiative: s.initiative.map((e, i) => i === idx ? { ...e, ...updates } : e) })
+  }
+
+  const toggleEntryCondition = (idx: number, cond: string) => {
+    const entry = s.initiative[idx]
+    if (!entry) return
+    const current = entry.conditions ?? []
+    const next = current.includes(cond) ? current.filter(c => c !== cond) : [...current, cond]
+    patchSession({ initiative: s.initiative.map((e, i) => i === idx ? { ...e, conditions: next } : e) })
+  }
+
+  const updateNpcDeathSave = (idx: number, type: 'success' | 'failure') => {
+    const entry = s.initiative[idx]
+    if (!entry?.isNpc) return
+    const successes = Math.min(3, (entry.death_successes ?? 0) + (type === 'success' ? 1 : 0))
+    const failures = Math.min(3, (entry.death_failures ?? 0) + (type === 'failure' ? 1 : 0))
+    const updates: Partial<InitiativeEntry> = { death_successes: successes, death_failures: failures }
+    if (successes >= 3) updates.is_stable = true
+    if (failures >= 3) { updates.is_dead = true; updates.death_successes = 0; updates.death_failures = 0 }
+    patchSession({ initiative: s.initiative.map((e, i) => i === idx ? { ...e, ...updates } : e) })
   }
 
   const removeEntry = (idx: number) => {
@@ -635,21 +813,16 @@ export default function DMDashboardScreen() {
       {/* ── Initiative Tab ───────────────────────────────────────────────────────── */}
       {tab === 'initiative' && (
         <div>
+          {/* Header */}
           <div style={{ background: 'var(--white)', border: '1px solid var(--border)', padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.5px' }}>Initiative Order</span>
             <div style={{ display: 'flex', gap: 8 }}>
               {s.combat_active && (
-                <button
-                  onClick={() => { haptic.medium(); nextTurn() }}
-                  style={{ padding: '5px 12px', background: 'var(--teal)', color: '#fff', border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer', borderRadius: 2, fontFamily: 'inherit' }}
-                >
+                <button onClick={() => { haptic.medium(); nextTurn() }} style={{ padding: '5px 12px', background: 'var(--teal)', color: '#fff', border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer', borderRadius: 2, fontFamily: 'inherit' }}>
                   Next Turn
                 </button>
               )}
-              <button
-                onClick={() => patchSession({ combat_active: !s.combat_active })}
-                style={{ padding: '5px 12px', background: s.combat_active ? 'var(--red)' : 'var(--green)', color: '#fff', border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer', borderRadius: 2, fontFamily: 'inherit' }}
-              >
+              <button onClick={() => patchSession({ combat_active: !s.combat_active })} style={{ padding: '5px 12px', background: s.combat_active ? 'var(--red)' : 'var(--green)', color: '#fff', border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer', borderRadius: 2, fontFamily: 'inherit' }}>
                 {s.combat_active ? 'End Combat' : 'Start Combat'}
               </button>
             </div>
@@ -657,7 +830,7 @@ export default function DMDashboardScreen() {
 
           {s.initiative.length === 0 && (
             <div style={{ background: 'var(--white)', border: '1px solid var(--border)', borderTop: 'none', padding: '16px 14px', color: 'var(--text3)', fontSize: 13, textAlign: 'center' }}>
-              Set player initiatives and add enemies below.
+              {s.combat_active ? 'No combatants in order.' : 'Stage creatures below, set player initiatives, then deploy.'}
             </div>
           )}
 
@@ -668,60 +841,90 @@ export default function DMDashboardScreen() {
               idx={idx}
               isCurrent={s.combat_active && idx === s.current_turn}
               chars={playerCharacters}
-              onHpChange={updateEnemyHp}
+              onHpDelta={updateEntryHpDelta}
               onRemove={removeEntry}
+              onToggleCondition={toggleEntryCondition}
+              onNpcDeathSave={updateNpcDeathSave}
             />
           ))}
 
-          {/* Set player initiatives */}
-          {playerCharacters.length > 0 && (
-            <div style={{ background: 'var(--white)', border: '1px solid var(--border)', borderTop: 'none', padding: '12px 14px' }}>
-              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 10 }}>Player Initiatives</div>
-              {playerCharacters.map(c => (
-                <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                  <span style={{ flex: 1, fontSize: 13 }}>{c.name}</span>
-                  <input
-                    type="number"
-                    value={playerInits[c.id] ?? ''}
-                    onChange={e => setPlayerInits(p => ({ ...p, [c.id]: e.target.value }))}
-                    placeholder="—"
-                    style={{ width: 56, border: 'none', borderBottom: '1px solid var(--border2)', background: 'transparent', textAlign: 'center', fontSize: 15, fontFamily: 'inherit', outline: 'none', padding: '2px 4px' }}
-                  />
+          {/* PRE-COMBAT SETUP */}
+          {!s.combat_active && (
+            <>
+              {/* Staging list */}
+              {stagingList.length > 0 && (
+                <div style={{ background: 'var(--white)', border: '1px solid var(--border)', borderTop: 'none', padding: '10px 14px' }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 8 }}>
+                    Staged Creatures ({stagingList.length}) — initiative auto-rolled on deploy
+                  </div>
+                  {stagingList.map(entry => (
+                    <div key={entry.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ fontSize: 13, fontWeight: 600 }}>{entry.name}</span>
+                          {entry.isNpc && <span style={{ fontSize: 9, fontWeight: 700, color: '#fff', background: '#6b7280', padding: '1px 4px', borderRadius: 2, textTransform: 'uppercase', letterSpacing: .3 }}>NPC</span>}
+                        </div>
+                        <span style={{ fontSize: 11, color: 'var(--text3)' }}>HP {entry.hp}{entry.ac != null ? ` · AC ${entry.ac}` : ''}</span>
+                      </div>
+                      <button onClick={() => setStagingList(p => p.filter(e => e.id !== entry.id))} style={{ background: 'none', border: 'none', color: 'var(--red)', cursor: 'pointer', fontSize: 14, padding: '0 2px', fontFamily: 'inherit' }}>✕</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Player initiatives */}
+              {playerCharacters.length > 0 && (
+                <div style={{ background: 'var(--white)', border: '1px solid var(--border)', borderTop: 'none', padding: '12px 14px' }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 10 }}>Player Initiatives</div>
+                  {playerCharacters.map(c => (
+                    <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                      <span style={{ flex: 1, fontSize: 13 }}>{c.name}</span>
+                      <input
+                        type="number"
+                        value={playerInits[c.id] ?? ''}
+                        onChange={e => setPlayerInits(p => ({ ...p, [c.id]: e.target.value }))}
+                        placeholder="—"
+                        style={{ width: 56, border: 'none', borderBottom: '1px solid var(--border2)', background: 'transparent', textAlign: 'center', fontSize: 15, fontFamily: 'inherit', outline: 'none', padding: '2px 4px' }}
+                      />
+                      <button
+                        onClick={() => setPlayerInits(p => ({ ...p, [c.id]: String(Math.floor(Math.random() * 20) + 1 + mod(c.dex)) }))}
+                        style={{ padding: '4px 8px', background: 'var(--border)', border: 'none', fontSize: 11, cursor: 'pointer', borderRadius: 2, fontFamily: 'inherit', color: 'var(--text2)' }}
+                      >Roll</button>
+                    </div>
+                  ))}
                   <button
-                    onClick={() => {
-                      const dexMod = mod(c.dex)
-                      const roll = Math.floor(Math.random() * 20) + 1 + dexMod
-                      setPlayerInits(p => ({ ...p, [c.id]: String(roll) }))
-                    }}
-                    style={{ padding: '4px 8px', background: 'var(--border)', border: 'none', fontSize: 11, cursor: 'pointer', borderRadius: 2, fontFamily: 'inherit', color: 'var(--text2)' }}
+                    onClick={buildAndSetInitiative}
+                    style={{ display: 'block', width: '100%', marginTop: 10, padding: 10, background: 'var(--teal)', color: '#fff', border: 'none', fontSize: 13, fontWeight: 600, cursor: 'pointer', borderRadius: 2, fontFamily: 'inherit' }}
                   >
-                    Roll
+                    {stagingList.length > 0 ? `Deploy ${stagingList.length} creature${stagingList.length !== 1 ? 's' : ''} & Start Combat` : 'Set Order & Start Combat'}
                   </button>
                 </div>
-              ))}
-              <button
-                onClick={buildAndSetInitiative}
-                style={{ display: 'block', width: '100%', marginTop: 10, padding: 10, background: 'var(--teal)', color: '#fff', border: 'none', fontSize: 13, fontWeight: 600, cursor: 'pointer', borderRadius: 2, fontFamily: 'inherit' }}
-              >
-                Set Order & Start Combat
-              </button>
-            </div>
+              )}
+            </>
           )}
 
-          {/* Add enemy */}
+          {/* Add creature form */}
           <div style={{ background: 'var(--white)', border: '1px solid var(--border)', borderTop: 'none', padding: '12px 14px' }}>
-            {/* Mode toggle */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.5px' }}>Add Enemy</div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.5px' }}>
+                {s.combat_active ? 'Add to Combat' : 'Add Creature'}
+              </div>
               <div style={{ display: 'flex', border: '1px solid var(--border2)', borderRadius: 3, overflow: 'hidden' }}>
-                <button onClick={() => setEnemyMode('custom')} style={{ padding: '4px 10px', background: enemyMode === 'custom' ? 'var(--teal)' : 'var(--white)', color: enemyMode === 'custom' ? '#fff' : 'var(--text2)', fontSize: 11, border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}>Custom</button>
-                <button onClick={() => setEnemyMode('db')} style={{ padding: '4px 10px', background: enemyMode === 'db' ? 'var(--teal)' : 'var(--white)', color: enemyMode === 'db' ? '#fff' : 'var(--text2)', fontSize: 11, border: 'none', borderLeft: '1px solid var(--border2)', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}>From Database</button>
+                <button onClick={() => setEnemyMode('db')} style={{ padding: '4px 10px', background: enemyMode === 'db' ? 'var(--teal)' : 'var(--white)', color: enemyMode === 'db' ? '#fff' : 'var(--text2)', fontSize: 11, border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}>Database</button>
+                <button onClick={() => setEnemyMode('custom')} style={{ padding: '4px 10px', background: enemyMode === 'custom' ? 'var(--teal)' : 'var(--white)', color: enemyMode === 'custom' ? '#fff' : 'var(--text2)', fontSize: 11, border: 'none', borderLeft: '1px solid var(--border2)', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}>Custom</button>
               </div>
             </div>
 
             {/* Database picker */}
             {enemyMode === 'db' && (
               <div style={{ marginBottom: 10 }}>
+                <div style={{ display: 'flex', gap: 4, marginBottom: 6 }}>
+                  {(['all', 'enemy', 'npc'] as const).map(f => (
+                    <button key={f} onClick={() => setCreatureFilter(f)} style={{ padding: '3px 10px', background: creatureFilter === f ? 'var(--teal)' : 'var(--border)', color: creatureFilter === f ? '#fff' : 'var(--text2)', border: 'none', borderRadius: 3, fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+                      {f === 'all' ? 'All' : f === 'enemy' ? 'Enemies' : 'NPCs'}
+                    </button>
+                  ))}
+                </div>
                 <input
                   value={enemyDbSearch}
                   onChange={e => setEnemyDbSearch(e.target.value)}
@@ -730,22 +933,23 @@ export default function DMDashboardScreen() {
                 />
                 <div style={{ maxHeight: 180, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 3 }}>
                   {CREATURE_DB
-                    .filter(c => !enemyDbSearch.trim() || c.name.toLowerCase().includes(enemyDbSearch.toLowerCase()))
+                    .filter(c => {
+                      const matchName = !enemyDbSearch.trim() || c.name.toLowerCase().includes(enemyDbSearch.toLowerCase())
+                      const matchType = creatureFilter === 'all' || (creatureFilter === 'npc' ? !!c.isNpc : !c.isNpc)
+                      return matchName && matchType
+                    })
                     .map(c => (
                       <div
                         key={c.name}
-                        onClick={() => {
-                          setEnemyName(c.name)
-                          setEnemyHp(String(c.hp))
-                          setEnemyAc(String(c.ac))
-                          setPendingAttacks(c.attacks)
-                          setEnemyDbSearch('')
-                        }}
+                        onClick={() => { setEnemyName(c.name); setEnemyHp(String(c.hp)); setEnemyAc(String(c.ac)); setPendingAttacks(c.attacks); setIsNpcToggle(!!c.isNpc); setEnemyDbSearch('') }}
                         style={{ padding: '8px 10px', cursor: 'pointer', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
                         onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--teal-light)'}
                         onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = ''}
                       >
-                        <span style={{ fontSize: 13, fontWeight: 600 }}>{c.name}</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ fontSize: 13, fontWeight: 600 }}>{c.name}</span>
+                          {c.isNpc && <span style={{ fontSize: 9, fontWeight: 700, color: '#fff', background: '#6b7280', padding: '1px 4px', borderRadius: 2, textTransform: 'uppercase', letterSpacing: .3 }}>NPC</span>}
+                        </div>
                         <span style={{ fontSize: 11, color: 'var(--text3)' }}>CR {c.cr} · AC {c.ac} · {c.hp} HP</span>
                       </div>
                     ))}
@@ -753,16 +957,31 @@ export default function DMDashboardScreen() {
               </div>
             )}
 
-            {/* Name / HP / AC / Init fields */}
+            {/* Name / HP / AC fields */}
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
               <input value={enemyName} onChange={e => setEnemyName(e.target.value)} placeholder="Name" style={{ flex: 2, minWidth: 80, border: 'none', borderBottom: '1px solid var(--border2)', background: 'transparent', fontSize: 14, fontFamily: 'inherit', outline: 'none', padding: '5px 2px' }} />
               <input value={enemyHp} onChange={e => setEnemyHp(e.target.value)} placeholder="HP" type="number" style={{ width: 52, border: 'none', borderBottom: '1px solid var(--border2)', background: 'transparent', fontSize: 14, fontFamily: 'inherit', outline: 'none', padding: '5px 2px', textAlign: 'center' }} />
               <input value={enemyAc} onChange={e => setEnemyAc(e.target.value)} placeholder="AC" type="number" style={{ width: 48, border: 'none', borderBottom: '1px solid var(--border2)', background: 'transparent', fontSize: 14, fontFamily: 'inherit', outline: 'none', padding: '5px 2px', textAlign: 'center' }} />
-              <input value={enemyInit} onChange={e => setEnemyInit(e.target.value)} placeholder="Init" type="number" style={{ width: 42, border: 'none', borderBottom: '1px solid var(--border2)', background: 'transparent', fontSize: 14, fontFamily: 'inherit', outline: 'none', padding: '5px 2px', textAlign: 'center' }} />
-              <button onClick={() => setEnemyInit(String(Math.floor(Math.random() * 20) + 1))} style={{ padding: '4px 6px', background: 'var(--border)', border: 'none', fontSize: 13, cursor: 'pointer', borderRadius: 2, fontFamily: 'inherit', color: 'var(--text2)', flexShrink: 0 }} title="Roll d20">🎲</button>
+              {s.combat_active && (
+                <>
+                  <input value={enemyInit} onChange={e => setEnemyInit(e.target.value)} placeholder="Init" type="number" style={{ width: 42, border: 'none', borderBottom: '1px solid var(--border2)', background: 'transparent', fontSize: 14, fontFamily: 'inherit', outline: 'none', padding: '5px 2px', textAlign: 'center' }} />
+                  <button onClick={() => setEnemyInit(String(Math.floor(Math.random() * 20) + 1))} style={{ padding: '4px 6px', background: 'var(--border)', border: 'none', fontSize: 13, cursor: 'pointer', borderRadius: 2, fontFamily: 'inherit', color: 'var(--text2)', flexShrink: 0 }} title="Roll d20">🎲</button>
+                </>
+              )}
             </div>
 
-            {/* Pending attacks list */}
+            {/* NPC toggle */}
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, cursor: 'pointer' }}>
+              <div
+                onClick={() => setIsNpcToggle(!isNpcToggle)}
+                style={{ width: 36, height: 20, borderRadius: 10, background: isNpcToggle ? '#6b7280' : 'var(--border2)', position: 'relative', cursor: 'pointer', transition: 'background 200ms', flexShrink: 0 }}
+              >
+                <div style={{ position: 'absolute', top: 2, left: isNpcToggle ? 16 : 2, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left 200ms' }} />
+              </div>
+              <span style={{ fontSize: 12, color: 'var(--text2)' }}>NPC (gets death saves at 0 HP)</span>
+            </label>
+
+            {/* Pending attacks */}
             {pendingAttacks.length > 0 && (
               <div style={{ marginBottom: 8, display: 'flex', flexDirection: 'column', gap: 3 }}>
                 {pendingAttacks.map((atk, i) => (
@@ -806,8 +1025,12 @@ export default function DMDashboardScreen() {
               </div>
             )}
 
-            <button onClick={addEnemy} disabled={!enemyName.trim()} style={{ padding: '7px 16px', background: enemyName.trim() ? 'var(--teal)' : 'var(--border)', color: enemyName.trim() ? '#fff' : 'var(--text3)', border: 'none', fontSize: 13, fontWeight: 600, cursor: enemyName.trim() ? 'pointer' : 'not-allowed', borderRadius: 2, fontFamily: 'inherit' }}>
-              + Add to Combat
+            <button
+              onClick={s.combat_active ? addCreatureToCombat : stageCreature}
+              disabled={!enemyName.trim()}
+              style={{ padding: '7px 16px', background: enemyName.trim() ? 'var(--teal)' : 'var(--border)', color: enemyName.trim() ? '#fff' : 'var(--text3)', border: 'none', fontSize: 13, fontWeight: 600, cursor: enemyName.trim() ? 'pointer' : 'not-allowed', borderRadius: 2, fontFamily: 'inherit' }}
+            >
+              {s.combat_active ? '+ Add to Combat' : '+ Stage for Combat'}
             </button>
           </div>
         </div>

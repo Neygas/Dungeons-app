@@ -262,7 +262,12 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     if (!activeSession) return
     const len = activeSession.initiative.length
     if (len === 0) return
-    const next = (activeSession.current_turn + 1) % len
+    let next = (activeSession.current_turn + 1) % len
+    let safety = 0
+    while (activeSession.initiative[next]?.is_dead && safety < len) {
+      next = (next + 1) % len
+      safety++
+    }
     await get().patchSession({ current_turn: next })
   },
 

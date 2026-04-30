@@ -19,6 +19,7 @@ export interface Creature {
   wis: number
   cha: number
   attacks: CreatureAttack[]
+  isNpc?: boolean
 }
 
 export const CREATURE_DB: Creature[] = [
@@ -137,6 +138,58 @@ export const CREATURE_DB: Creature[] = [
     attacks: [
       { name: 'Claws', attackBonus: 6, damageDice: '2d4+3', damageType: 'slashing' },
       { name: 'Bite', attackBonus: 6, damageDice: '1d6+3', damageType: 'piercing', savingThrow: { ability: 'CON', dc: 13, effect: 'max HP reduced by damage dealt until long rest' } },
+    ],
+  },
+  // ── NPCs ──────────────────────────────────────────────────────────────────────
+  {
+    name: 'Town Guard', ac: 16, hp: 11, cr: '—', speed: '30 ft',
+    str: 13, dex: 12, con: 12, int: 10, wis: 11, cha: 10,
+    isNpc: true,
+    attacks: [
+      { name: 'Spear', attackBonus: 3, damageDice: '1d8+1', damageType: 'piercing' },
+    ],
+  },
+  {
+    name: 'Bandit Captain', ac: 15, hp: 65, cr: '—', speed: '30 ft',
+    str: 15, dex: 16, con: 14, int: 14, wis: 11, cha: 14,
+    isNpc: true,
+    attacks: [
+      { name: 'Scimitar', attackBonus: 5, damageDice: '1d6+3', damageType: 'slashing' },
+      { name: 'Dagger', attackBonus: 5, damageDice: '1d4+3', damageType: 'piercing' },
+    ],
+  },
+  {
+    name: 'Tavern Brawler', ac: 11, hp: 32, cr: '—', speed: '30 ft',
+    str: 14, dex: 12, con: 12, int: 10, wis: 10, cha: 10,
+    isNpc: true,
+    attacks: [
+      { name: 'Fist', attackBonus: 4, damageDice: '1d4+2', damageType: 'bludgeoning' },
+      { name: 'Chair', attackBonus: 4, damageDice: '1d6+2', damageType: 'bludgeoning' },
+    ],
+  },
+  {
+    name: 'Merchant', ac: 10, hp: 4, cr: '—', speed: '30 ft',
+    str: 10, dex: 10, con: 10, int: 11, wis: 10, cha: 11,
+    isNpc: true,
+    attacks: [
+      { name: 'Unarmed Strike', attackBonus: 0, damageDice: '1', damageType: 'bludgeoning' },
+    ],
+  },
+  {
+    name: 'Village Elder', ac: 10, hp: 9, cr: '—', speed: '30 ft',
+    str: 8, dex: 10, con: 10, int: 12, wis: 14, cha: 13,
+    isNpc: true,
+    attacks: [
+      { name: 'Walking Stick', attackBonus: 1, damageDice: '1d4-1', damageType: 'bludgeoning' },
+    ],
+  },
+  {
+    name: 'Spy', ac: 12, hp: 27, cr: '—', speed: '30 ft',
+    str: 10, dex: 15, con: 10, int: 12, wis: 14, cha: 16,
+    isNpc: true,
+    attacks: [
+      { name: 'Shortsword', attackBonus: 4, damageDice: '1d6+2', damageType: 'piercing' },
+      { name: 'Hand Crossbow', attackBonus: 4, damageDice: '1d6+2', damageType: 'piercing' },
     ],
   },
 ]

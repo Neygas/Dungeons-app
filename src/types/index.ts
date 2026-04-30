@@ -198,11 +198,17 @@ export interface InitiativeEntry {
   name: string
   initiative: number
   isPlayer: boolean
+  isNpc?: boolean
   characterId?: string
   hp?: number
   maxHp?: number
   ac?: number
   attacks?: CreatureAttack[]
+  conditions?: string[]
+  death_successes?: number
+  death_failures?: number
+  is_stable?: boolean
+  is_dead?: boolean
 }
 
 export interface ShopItem {
