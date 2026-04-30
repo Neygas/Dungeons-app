@@ -255,20 +255,24 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     set(s => ({ activeSession: s.activeSession ? { ...s.activeSession, ...finalUpdates } : null }))
   },
 
-  setInitiative: async (order) => get().patchSession({ initiative: order, current_turn: 0 }),
+  setInitiative: async (order) => get().patchSession({ initiative: order, current_turn: 0, combat_round: 1 }),
 
   nextTurn: async () => {
     const { activeSession } = get()
     if (!activeSession) return
     const len = activeSession.initiative.length
     if (len === 0) return
-    let next = (activeSession.current_turn + 1) % len
+    const rawNext = (activeSession.current_turn + 1) % len
+    let next = rawNext
     let safety = 0
     while (activeSession.initiative[next]?.is_dead && safety < len) {
       next = (next + 1) % len
       safety++
     }
-    await get().patchSession({ current_turn: next })
+    const newRound = rawNext === 0
+      ? (activeSession.combat_round ?? 1) + 1
+      : (activeSession.combat_round ?? 1)
+    await get().patchSession({ current_turn: next, combat_round: newRound })
   },
 
   // ── Combat log ─────────────────────────────────────────────────────────────

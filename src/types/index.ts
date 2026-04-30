@@ -248,6 +248,7 @@ export interface Session {
   loot_title?: string
   dm_notes: string
   active: boolean
+  combat_round: number
   created_at: string
 }
 
