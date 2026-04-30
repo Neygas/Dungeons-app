@@ -339,9 +339,7 @@ function InitEntryRow({ entry, idx, isCurrent, chars, onHpDelta, onRemove, onTog
         {isCurrent && (
           <span style={{ fontSize: 9, fontWeight: 700, color: '#fff', background: 'var(--teal)', padding: '2px 5px', borderRadius: 2, letterSpacing: .5, textTransform: 'uppercase' }}>TURN</span>
         )}
-        {!entry.isPlayer && (
-          <button onClick={() => onRemove(idx)} style={{ background: 'none', border: 'none', color: 'var(--red)', cursor: 'pointer', fontSize: 14, padding: '0 2px', fontFamily: 'inherit' }}>✕</button>
-        )}
+        <button onClick={() => onRemove(idx)} style={{ background: 'none', border: 'none', color: 'var(--red)', cursor: 'pointer', fontSize: 14, padding: '0 2px', fontFamily: 'inherit' }}>✕</button>
       </div>
 
       {/* Attacks panel */}
@@ -915,6 +913,12 @@ export default function DMDashboardScreen() {
               )}
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
+              {s.initiative.length > 0 && !s.combat_active && (
+                <button
+                  onClick={() => patchSession({ initiative: [], current_turn: 0, combat_round: 1 })}
+                  style={{ padding: '5px 10px', background: 'var(--border)', color: 'var(--text2)', border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer', borderRadius: 2, fontFamily: 'inherit' }}
+                >Clear All</button>
+              )}
               {s.combat_active && (
                 <button onClick={() => { haptic.medium(); nextTurn() }} style={{ padding: '5px 12px', background: 'var(--teal)', color: '#fff', border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer', borderRadius: 2, fontFamily: 'inherit' }}>
                   Next Turn
