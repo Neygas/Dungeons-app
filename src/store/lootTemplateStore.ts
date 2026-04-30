@@ -13,7 +13,7 @@ interface LootTemplateState {
   remove: (id: string) => Promise<void>
 }
 
-export const useLootTemplateStore = create<LootTemplateState>((set, get) => ({
+export const useLootTemplateStore = create<LootTemplateState>((set) => ({
   templates: [],
   loading: false,
 

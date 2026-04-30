@@ -22,7 +22,7 @@ interface CustomCreatureState {
   remove: (id: string) => Promise<void>
 }
 
-export const useCustomCreatureStore = create<CustomCreatureState>((set, get) => ({
+export const useCustomCreatureStore = create<CustomCreatureState>((set) => ({
   creatures: [],
   loading: false,
 
