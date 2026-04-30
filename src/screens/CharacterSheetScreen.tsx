@@ -180,7 +180,7 @@ export default function CharacterSheetScreen() {
             transition={{ duration: 0.35, ease: [0.25, 0.46, 0.45, 0.94] as [number, number, number, number] }}
             style={{
               position: 'fixed', top: 0, left: 0, right: 0, zIndex: 999,
-              background: 'var(--teal)', color: '#fff',
+              background: '#7f1d1d', color: '#fff',
               padding: '14px 20px',
               textAlign: 'center',
               fontSize: 18, fontWeight: 800,
