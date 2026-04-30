@@ -4,6 +4,7 @@ import type { Spell } from '@/types'
 import { CLASSES, SPELL_DB, SPELL_SLOTS_TABLE } from '@/data'
 import { spellSaveDC, spellAttackBonus, fmtBonus } from '@/lib/calculations'
 import { useCharacterStore } from '@/store/characterStore'
+import { useSessionStore } from '@/store/sessionStore'
 import { useUIStore } from '@/store/uiStore'
 import AddModal from '@/components/shared/AddModal'
 import SwipeToDelete from '@/components/shared/SwipeToDelete'
@@ -16,6 +17,7 @@ const PREPARED_CASTERS = ['Cleric', 'Druid', 'Paladin', 'Artificer', 'Wizard']
 
 export default function SpellsSection({ character: c }: Props) {
   const { patchActiveCharacter } = useCharacterStore()
+  const { logEntry, getJoinedSession } = useSessionStore()
   const { showToast } = useUIStore()
   const [openSpell, setOpenSpell] = useState<Spell | null>(null)
   const [showAddModal, setShowAddModal] = useState(false)
@@ -53,8 +55,15 @@ export default function SpellsSection({ character: c }: Props) {
   }
 
   const castSpell = async (spell: Spell, slotLevel?: number) => {
-    if (spell.level === 0) { showToast(`Cast ${spell.name}`); setOpenSpell(null); return }
-    const lvlIdx = (slotLevel ?? spell.level) - 1
+    const castLevel = slotLevel ?? spell.level
+    if (spell.level === 0) {
+      showToast(`Cast ${spell.name}`)
+      const sid = getJoinedSession(c.id)
+      if (sid) await logEntry(sid, c.name, 'spell_cast', `${c.name} cast ${spell.name} (cantrip)`, { spell: spell.name, level: 0 }, c.id)
+      setOpenSpell(null)
+      return
+    }
+    const lvlIdx = castLevel - 1
     const used = [...(c.spell_slots_used ?? [])]
     while (used.length <= lvlIdx) used.push(0)
     const total = slots[lvlIdx] ?? 0
@@ -73,6 +82,8 @@ export default function SpellsSection({ character: c }: Props) {
       showToast(`Cast ${spell.name}`)
     }
     await patchActiveCharacter(updates)
+    const sid = getJoinedSession(c.id)
+    if (sid) await logEntry(sid, c.name, 'spell_cast', `${c.name} cast ${spell.name} at level ${castLevel}`, { spell: spell.name, level: castLevel }, c.id)
     setOpenSpell(null)
   }
 
