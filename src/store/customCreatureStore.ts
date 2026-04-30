@@ -36,9 +36,11 @@ export const useCustomCreatureStore = create<CustomCreatureState>((set) => ({
   },
 
   save: async (c) => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return null
     const { data, error } = await supabase
       .from('custom_creatures')
-      .insert(c)
+      .insert({ ...c, user_id: user.id })
       .select()
       .single()
     if (error || !data) return null

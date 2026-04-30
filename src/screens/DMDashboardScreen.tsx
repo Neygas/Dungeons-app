@@ -260,7 +260,7 @@ function InitEntryRow({ entry, idx, isCurrent, chars, onHpDelta, onRemove, onTog
   onToggleCondition: (idx: number, cond: string) => void
   onNpcDeathSave: (idx: number, type: 'success' | 'failure') => void
 }) {
-  const { dmPatchCharacter, logEntry, activeSession } = useSessionStore()
+  const { dmPatchCharacter, logEntry, activeSession, combatLog } = useSessionStore()
   const [hpInput, setHpInput] = useState('')
   const [showCond, setShowCond] = useState(false)
   const [showAttacks, setShowAttacks] = useState(false)
@@ -271,8 +271,12 @@ function InitEntryRow({ entry, idx, isCurrent, chars, onHpDelta, onRemove, onTog
   const pct = maxHp > 0 ? hp / maxHp : 0
   const isDead = !!entry.is_dead
   const isDying = !!entry.isNpc && hp <= 0 && !entry.is_dead && !entry.is_stable
+  const isPlayerDying = entry.isPlayer && !!char && char.hp <= 0 && !char.is_dead && !char.is_stable
   const attacks = entry.attacks ?? []
   const conditions = entry.isPlayer ? (char?.conditions ?? []) : (entry.conditions ?? [])
+  const recentActions = entry.characterId
+    ? combatLog.filter(l => l.character_id === entry.characterId && (l.type === 'attack' || l.type === 'spell_cast')).slice(0, 4)
+    : []
 
   const applyDelta = (sign: 1 | -1) => {
     const num = Math.max(1, parseInt(hpInput) || 1)
@@ -300,7 +304,7 @@ function InitEntryRow({ entry, idx, isCurrent, chars, onHpDelta, onRemove, onTog
         <span style={{ fontSize: 16, fontWeight: 700, color: isDead ? 'var(--text3)' : 'var(--teal2)', width: 28, textAlign: 'center', flexShrink: 0 }}>{entry.initiative}</span>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: isDead ? 'var(--text3)' : 'var(--text)', textDecoration: isDead ? 'line-through' : 'none' }}>{entry.name}</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: isDead ? 'var(--text3)' : (char?.inspiration ? 'var(--gold)' : 'var(--text)'), textDecoration: isDead ? 'line-through' : 'none' }}>{entry.name}</span>
             {entry.isNpc && !isDead && <span style={{ fontSize: 9, fontWeight: 700, color: '#fff', background: '#6b7280', padding: '1px 4px', borderRadius: 2, textTransform: 'uppercase', letterSpacing: .3 }}>NPC</span>}
             {isDead && <span style={{ fontSize: 9, fontWeight: 700, color: '#fff', background: 'var(--red)', padding: '1px 4px', borderRadius: 2, textTransform: 'uppercase', letterSpacing: .3 }}>DEAD</span>}
             {entry.is_stable && !isDead && <span style={{ fontSize: 9, fontWeight: 700, color: '#fff', background: 'var(--green)', padding: '1px 4px', borderRadius: 2, textTransform: 'uppercase', letterSpacing: .3 }}>STABLE</span>}
@@ -382,21 +386,37 @@ function InitEntryRow({ entry, idx, isCurrent, chars, onHpDelta, onRemove, onTog
         </div>
       )}
 
-      {/* Condition toggle button for players */}
+      {/* Conditions & History toggle for players */}
       {entry.isPlayer && (
         <div style={{ padding: '0 12px 6px' }}>
           <button
             onClick={() => setShowCond(!showCond)}
             style={{ fontSize: 11, color: 'var(--teal)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}
           >
-            {showCond ? 'Hide conditions ▲' : 'Edit conditions ▼'}
+            {showCond ? 'Hide ▲' : 'Conditions & History ▼'}
           </button>
         </div>
       )}
 
-      {/* Condition picker */}
+      {/* Conditions & History panel */}
       {showCond && (
         <div style={{ padding: '4px 12px 10px' }}>
+          {/* Recent actions */}
+          {recentActions.length > 0 && (
+            <div style={{ marginBottom: 8 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 4 }}>Recent Actions</div>
+              {recentActions.map(log => (
+                <div key={log.id} style={{ fontSize: 11, color: 'var(--text2)', padding: '2px 0', borderBottom: '1px solid var(--border)', lineHeight: 1.4 }}>
+                  <span style={{ color: log.type === 'spell_cast' ? 'var(--purple)' : 'var(--orange)', fontWeight: 700, marginRight: 4 }}>
+                    {log.type === 'spell_cast' ? '✦' : '⚔'}
+                  </span>
+                  {log.description}
+                </div>
+              ))}
+            </div>
+          )}
+          {/* Condition picker */}
+          <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 4 }}>Conditions</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
             {CONDITIONS.map(cond => {
               const active = conditions.includes(cond)
@@ -414,24 +434,28 @@ function InitEntryRow({ entry, idx, isCurrent, chars, onHpDelta, onRemove, onTog
         </div>
       )}
 
-      {/* NPC death saves */}
+      {/* NPC death saves (editable) */}
       {isDying && (
         <div style={{ padding: '4px 12px 10px', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
           <span style={{ fontSize: 11, color: 'var(--red)', fontWeight: 700 }}>Saving throws:</span>
           <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
             <span style={{ fontSize: 12 }}>S: {'●'.repeat(entry.death_successes ?? 0)}{'○'.repeat(3 - (entry.death_successes ?? 0))}</span>
-            <button
-              onClick={() => onNpcDeathSave(idx, 'success')}
-              style={{ padding: '2px 8px', background: 'var(--green)', color: '#fff', border: 'none', fontSize: 11, fontWeight: 700, cursor: 'pointer', borderRadius: 2, fontFamily: 'inherit' }}
-            >✓</button>
+            <button onClick={() => onNpcDeathSave(idx, 'success')} style={{ padding: '2px 8px', background: 'var(--green)', color: '#fff', border: 'none', fontSize: 11, fontWeight: 700, cursor: 'pointer', borderRadius: 2, fontFamily: 'inherit' }}>✓</button>
           </div>
           <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
             <span style={{ fontSize: 12 }}>F: {'●'.repeat(entry.death_failures ?? 0)}{'○'.repeat(3 - (entry.death_failures ?? 0))}</span>
-            <button
-              onClick={() => onNpcDeathSave(idx, 'failure')}
-              style={{ padding: '2px 8px', background: 'var(--red)', color: '#fff', border: 'none', fontSize: 11, fontWeight: 700, cursor: 'pointer', borderRadius: 2, fontFamily: 'inherit' }}
-            >✗</button>
+            <button onClick={() => onNpcDeathSave(idx, 'failure')} style={{ padding: '2px 8px', background: 'var(--red)', color: '#fff', border: 'none', fontSize: 11, fontWeight: 700, cursor: 'pointer', borderRadius: 2, fontFamily: 'inherit' }}>✗</button>
           </div>
+        </div>
+      )}
+
+      {/* Player death saves (read-only) */}
+      {isPlayerDying && char && (
+        <div style={{ padding: '4px 12px 10px', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 11, color: 'var(--red)', fontWeight: 700 }}>Dying:</span>
+          <span style={{ fontSize: 12 }}>S: {'●'.repeat(char.death_successes ?? 0)}{'○'.repeat(3 - (char.death_successes ?? 0))}</span>
+          <span style={{ fontSize: 12 }}>F: {'●'.repeat(char.death_failures ?? 0)}{'○'.repeat(3 - (char.death_failures ?? 0))}</span>
+          {char.is_stable && <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--green)' }}>STABLE</span>}
         </div>
       )}
     </div>

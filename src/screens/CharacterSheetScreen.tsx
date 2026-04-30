@@ -195,7 +195,7 @@ export default function CharacterSheetScreen() {
       </AnimatePresence>
 
       {/* Sticky header */}
-      <div style={{ position: 'sticky', top: 0, zIndex: 100, background: 'var(--teal)' }}>
+      <div style={{ position: 'sticky', top: 0, zIndex: 100, background: activeSession?.combat_active ? '#7f1d1d' : 'var(--teal)', transition: 'background .4s' }}>
 
         {collapsed ? (
           /* ── Collapsed header ── */

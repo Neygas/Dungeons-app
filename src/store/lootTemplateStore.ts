@@ -50,9 +50,11 @@ export const useLootTemplateStore = create<LootTemplateState>((set) => ({
   },
 
   save: async (template) => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return null
     const { data, error } = await supabase
       .from('dm_loot_templates')
-      .insert({ name: template.name, rarity: template.rarity, items: template.items })
+      .insert({ name: template.name, rarity: template.rarity, items: template.items, user_id: user.id })
       .select()
       .single()
     if (error || !data) return null

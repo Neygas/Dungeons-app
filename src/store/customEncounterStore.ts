@@ -41,9 +41,11 @@ export const useCustomEncounterStore = create<CustomEncounterState>((set) => ({
   },
 
   save: async (name, creatures) => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return null
     const { data, error } = await supabase
       .from('custom_encounters')
-      .insert({ name, creatures })
+      .insert({ name, creatures, user_id: user.id })
       .select()
       .single()
     if (error || !data) return null
