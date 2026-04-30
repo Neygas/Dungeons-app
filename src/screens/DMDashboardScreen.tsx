@@ -472,7 +472,7 @@ export default function DMDashboardScreen() {
     loadSession, subscribeAll, unsubscribeAll,
     patchSession, setInitiative, nextTurn, clearLog,
   } = useSessionStore()
-  const { showCutscene } = useUIStore()
+  const { showCutscene, showToast } = useUIStore()
   const { creatures: customCreatures, load: loadCustomCreatures, save: saveCustomCreature, remove: removeCustomCreature } = useCustomCreatureStore()
   const { encounters: customEncounters, load: loadCustomEncounters, save: saveCustomEncounter, remove: removeCustomEncounter } = useCustomEncounterStore()
   const { templates: savedTemplates, load: loadLootTemplates, save: saveLootTemplate, remove: removeLootTemplate } = useLootTemplateStore()
@@ -743,13 +743,14 @@ export default function DMDashboardScreen() {
 
   const saveCreatureToDb = async () => {
     if (!enemyName.trim()) return
-    await saveCustomCreature({
+    const result = await saveCustomCreature({
       name: enemyName.trim(),
       hp: parseInt(enemyHp) || 10,
       ac: parseInt(enemyAc) || 10,
       is_npc: isNpcToggle,
       attacks: pendingAttacks,
     })
+    if (result) showToast(`${result.name} saved to My Creatures`)
   }
 
   // ── Loot handlers ────────────────────────────────────────────────────────────
