@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="40%" r="60%">
+      <stop offset="0%" stop-color="#1e1530"/>
+      <stop offset="100%" stop-color="#0d0d14"/>
+    </radialGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#4fd1c5" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#4fd1c5" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="32" height="32" rx="6" fill="url(#bg)"/>
+
+  <!-- Subtle glow -->
+  <ellipse cx="16" cy="14" rx="12" ry="10" fill="url(#glow)"/>
+
+  <!-- D20 shape (icosahedron face silhouette) -->
+  <polygon
+    points="16,3 28,11 26,24 6,24 4,11"
+    fill="none"
+    stroke="#4fd1c5"
+    stroke-width="1.2"
+    stroke-linejoin="round"
+  />
+
+  <!-- Inner triangle top -->
+  <polygon
+    points="16,3 28,11 4,11"
+    fill="none"
+    stroke="#9b59b6"
+    stroke-width="0.9"
+    stroke-linejoin="round"
+    opacity="0.85"
+  />
+
+  <!-- Inner lines -->
+  <line x1="4" y1="11" x2="6" y2="24" stroke="#9b59b6" stroke-width="0.9" opacity="0.85"/>
+  <line x1="28" y1="11" x2="26" y2="24" stroke="#9b59b6" stroke-width="0.9" opacity="0.85"/>
+  <line x1="16" y1="3" x2="16" y2="24" stroke="#4fd1c5" stroke-width="0.7" opacity="0.4"/>
+  <line x1="4" y1="11" x2="28" y2="11" stroke="#4fd1c5" stroke-width="0.7" opacity="0.4"/>
+  <line x1="4" y1="11" x2="26" y2="24" stroke="#4fd1c5" stroke-width="0.7" opacity="0.25"/>
+  <line x1="28" y1="11" x2="6" y2="24" stroke="#4fd1c5" stroke-width="0.7" opacity="0.25"/>
+
+  <!-- "20" text in center -->
+  <text
+    x="16"
+    y="19"
+    text-anchor="middle"
+    font-family="Georgia, serif"
+    font-size="7.5"
+    font-weight="bold"
+    fill="#4fd1c5"
+    letter-spacing="0.5"
+  >20</text>
+</svg>
