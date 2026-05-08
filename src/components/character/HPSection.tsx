@@ -76,8 +76,8 @@ export default function HPSection({ character: c }: Props) {
   const menuItems = [
     { label: 'Conditions' + (c.conditions.length > 0 ? ` (${c.conditions.length})` : ''), action: () => { openSheet('conditions'); setShowMenu(false) } },
     { label: 'Temp HP', action: () => { openSheet('tempHp'); setShowMenu(false) } },
-    { label: 'Short Rest', action: () => { openSheet('rest'); setShowMenu(false) } },
-    { label: 'Long Rest', action: () => { openSheet('rest'); setShowMenu(false) } },
+    { label: 'Short Rest', action: () => { openSheet('shortRest'); setShowMenu(false) } },
+    { label: 'Long Rest', action: () => { openSheet('longRest'); setShowMenu(false) } },
   ]
 
   return (
@@ -238,8 +238,8 @@ export function TempHPSheet({ character: c }: Props) {
   )
 }
 
-// ===== Rest Sheet =====
-export function RestSheet({ character: c }: Props) {
+// ===== Short Rest Sheet =====
+export function ShortRestSheet({ character: c }: Props) {
   const { patchActiveCharacter } = useCharacterStore()
   const { showToast, closeSheet, showCutscene } = useUIStore()
   const [hdMode, setHdMode] = useState<'avg' | 'roll' | 'manual'>('avg')
@@ -248,23 +248,90 @@ export function RestSheet({ character: c }: Props) {
   const hd = { Barbarian: 12, Bard: 8, Cleric: 8, Druid: 8, Fighter: 10, Monk: 8, Paladin: 10, Ranger: 10, Rogue: 8, Sorcerer: 6, Warlock: 8, Wizard: 6 }[c.class] ?? 8
   const hdRem = c.hit_dice_total - c.hit_dice_used
   const conMod = Math.floor((c.con - 10) / 2)
+  const conModStr = conMod >= 0 ? `+${conMod}` : String(conMod)
+  const avgHeal = Math.max(0, Math.floor(hd / 2) + 1 + conMod)
 
-  const shortRest = async () => {
+  const doShortRest = async () => {
     if (hdRem <= 0) { showToast('No hit dice remaining'); return }
     let gain = 0
     if (hdMode === 'avg') gain = Math.floor(hd / 2) + 1 + conMod
     else if (hdMode === 'roll') gain = Math.floor(Math.random() * hd) + 1 + conMod
     else gain = parseInt(hdManual) || 0
-    await patchActiveCharacter({ hp: Math.min(c.max_hp, c.hp + Math.max(0, gain)), hit_dice_used: c.hit_dice_used + 1 })
-    showToast(`Short rest: +${Math.max(0, gain)} HP`)
+    gain = Math.max(0, gain)
+    await patchActiveCharacter({ hp: Math.min(c.max_hp, c.hp + gain), hit_dice_used: c.hit_dice_used + 1 })
+    showToast(`Short rest: +${gain} HP`)
     closeSheet()
     haptic.shortRest()
     showCutscene('short-rest')
   }
 
-  const longRest = async () => {
+  return (
+    <div style={{ padding: 16 }}>
+      {/* Header info */}
+      <div style={{ background: 'var(--bg)', borderRadius: 6, padding: '12px 14px', marginBottom: 16 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+          <span style={{ fontSize: 13, color: 'var(--text3)' }}>Hit Dice remaining</span>
+          <span style={{ fontSize: 13, fontWeight: 700, color: hdRem > 0 ? 'var(--teal2)' : 'var(--red)' }}>{hdRem} / {c.hit_dice_total} (d{hd})</span>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+          <span style={{ fontSize: 13, color: 'var(--text3)' }}>Current HP</span>
+          <span style={{ fontSize: 13, fontWeight: 700 }}>{c.hp} / {c.max_hp}</span>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+          <span style={{ fontSize: 13, color: 'var(--text3)' }}>CON modifier</span>
+          <span style={{ fontSize: 13, fontWeight: 700 }}>{conModStr}</span>
+        </div>
+      </div>
+
+      <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 12, lineHeight: 1.6 }}>
+        Spend one Hit Die to recover HP. Roll 1d{hd} + CON modifier ({conModStr}). You can spend multiple dice by resting again.
+      </div>
+
+      {/* Mode picker */}
+      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 8 }}>How to roll your Hit Die</div>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+        {(['avg', 'roll', 'manual'] as const).map(m => (
+          <button key={m} onClick={() => setHdMode(m)} style={{ flex: 1, padding: '10px 4px', border: `${hdMode === m ? 2 : 1}px solid ${hdMode === m ? 'var(--teal)' : 'var(--border2)'}`, background: hdMode === m ? 'var(--teal-light)' : 'var(--white)', cursor: 'pointer', borderRadius: 4, fontFamily: 'inherit' }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: hdMode === m ? 'var(--teal2)' : 'var(--text)' }}>{m === 'avg' ? 'Average' : m === 'roll' ? 'Roll' : 'Manual'}</div>
+            <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>{m === 'avg' ? `~${avgHeal} HP` : m === 'roll' ? `1d${hd} ${conModStr}` : 'type a value'}</div>
+          </button>
+        ))}
+      </div>
+
+      {hdMode === 'manual' && (
+        <input
+          type="number" value={hdManual} onChange={e => setHdManual(e.target.value)}
+          placeholder="HP to recover"
+          style={{ display: 'block', width: '100%', border: '1px solid var(--border2)', padding: '10px 12px', fontSize: 16, textAlign: 'center', fontFamily: 'inherit', borderRadius: 4, outline: 'none', marginBottom: 12, background: 'var(--white)', color: 'var(--text)', boxSizing: 'border-box' }}
+        />
+      )}
+
+      <button
+        onClick={doShortRest}
+        disabled={hdRem <= 0}
+        style={{ display: 'block', width: '100%', padding: 13, background: hdRem > 0 ? 'var(--teal)' : 'var(--border)', color: hdRem > 0 ? '#fff' : 'var(--text3)', border: 'none', fontSize: 15, fontWeight: 600, cursor: hdRem > 0 ? 'pointer' : 'not-allowed', borderRadius: 4, fontFamily: 'inherit' }}
+      >
+        {hdRem > 0 ? `Take Short Rest — spend 1 Hit Die` : 'No Hit Dice remaining'}
+      </button>
+    </div>
+  )
+}
+
+// ===== Long Rest Sheet =====
+export function LongRestSheet({ character: c }: Props) {
+  const { patchActiveCharacter } = useCharacterStore()
+  const { showToast, closeSheet, showCutscene } = useUIStore()
+
+  const hd = { Barbarian: 12, Bard: 8, Cleric: 8, Druid: 8, Fighter: 10, Monk: 8, Paladin: 10, Ranger: 10, Rogue: 8, Sorcerer: 6, Warlock: 8, Wizard: 6 }[c.class] ?? 8
+  const hdRem = c.hit_dice_total - c.hit_dice_used
+  const hdRecovered = Math.max(1, Math.floor(c.hit_dice_total / 2))
+  const hpMissing = c.max_hp - c.hp
+  const slotLevels = c.spell_slots_used.filter(n => n > 0).length
+
+  const doLongRest = async () => {
     await patchActiveCharacter({
-      hp: c.max_hp, hit_dice_used: Math.max(0, c.hit_dice_used - Math.max(1, Math.floor(c.hit_dice_total / 2))),
+      hp: c.max_hp,
+      hit_dice_used: Math.max(0, c.hit_dice_used - hdRecovered),
       spell_slots_used: c.spell_slots_used.map(() => 0),
       death_successes: 0, death_failures: 0, is_stable: false, conditions: [],
     })
@@ -276,29 +343,36 @@ export function RestSheet({ character: c }: Props) {
 
   return (
     <div style={{ padding: 16 }}>
-      <div style={{ marginBottom: 20 }}>
-        <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 12 }}>Short Rest <span style={{ color: 'var(--text3)', fontWeight: 400, fontSize: 13 }}>— Spend a Hit Die</span></div>
-        <div style={{ fontSize: 13, color: 'var(--text3)', marginBottom: 10 }}>
-          Hit Dice remaining: <strong style={{ color: 'var(--teal2)' }}>{hdRem}</strong> / {c.hit_dice_total} (d{hd})
-        </div>
-        <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
-          {(['avg', 'roll', 'manual'] as const).map(m => (
-            <button key={m} onClick={() => setHdMode(m)} style={{ flex: 1, padding: '10px 4px', border: `${hdMode === m ? 2 : 1}px solid ${hdMode === m ? 'var(--teal)' : 'var(--border2)'}`, background: hdMode === m ? 'var(--teal-light)' : 'var(--white)', cursor: 'pointer', borderRadius: 2, fontFamily: 'inherit' }}>
-              <div style={{ fontSize: 13, fontWeight: 600 }}>{m === 'avg' ? 'Average' : m === 'roll' ? 'Roll' : 'Manual'}</div>
-              <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>{m === 'avg' ? `${Math.floor(hd / 2) + 1}` : m === 'roll' ? `1d${hd}` : 'Enter value'}</div>
-            </button>
-          ))}
-        </div>
-        {hdMode === 'manual' && <input type="number" value={hdManual} onChange={e => setHdManual(e.target.value)} placeholder="HP gained" style={{ width: 100, border: '1px solid var(--border2)', padding: 8, fontSize: 16, textAlign: 'center', fontFamily: 'inherit', borderRadius: 2, outline: 'none', marginBottom: 10, background: 'var(--white)', color: 'var(--text)' }} />}
-        <button onClick={shortRest} disabled={hdRem <= 0} style={{ display: 'block', width: '100%', padding: 12, background: hdRem > 0 ? 'var(--white)' : 'var(--bg)', border: '1px solid var(--border2)', color: hdRem > 0 ? 'var(--text)' : 'var(--text3)', fontSize: 14, fontWeight: 500, cursor: hdRem > 0 ? 'pointer' : 'not-allowed', borderRadius: 2, fontFamily: 'inherit' }}>
-          Short Rest — use 1 HD + {conMod >= 0 ? '+' : ''}{conMod} CON
-        </button>
+      <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 16, lineHeight: 1.6 }}>
+        A long rest is at least 8 hours of sleep or light activity. You can only benefit from one long rest per 24 hours.
       </div>
-      <div style={{ borderTop: '1px solid var(--border)', paddingTop: 16 }}>
-        <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>Long Rest <span style={{ color: 'var(--text3)', fontWeight: 400, fontSize: 13 }}>— 8 hours</span></div>
-        <div style={{ fontSize: 13, color: 'var(--text3)', marginBottom: 12, lineHeight: 1.6 }}>Restores all HP, half spent Hit Dice, all spell slots, clears death saves and conditions.</div>
-        <button onClick={longRest} style={{ display: 'block', width: '100%', padding: 12, background: 'var(--teal)', color: '#fff', border: 'none', fontSize: 14, fontWeight: 600, cursor: 'pointer', borderRadius: 2, fontFamily: 'inherit' }}>Take Long Rest</button>
+
+      {/* What gets restored */}
+      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 8 }}>What gets restored</div>
+      <div style={{ background: 'var(--bg)', borderRadius: 6, overflow: 'hidden', marginBottom: 20 }}>
+        {[
+          { label: 'Hit Points', before: `${c.hp} / ${c.max_hp}`, after: `${c.max_hp} / ${c.max_hp}`, gained: hpMissing > 0 ? `+${hpMissing}` : 'Full', ok: hpMissing > 0 },
+          { label: 'Hit Dice', before: `${hdRem} / ${c.hit_dice_total} (d${hd})`, after: `${Math.min(c.hit_dice_total, hdRem + hdRecovered)} / ${c.hit_dice_total}`, gained: `+${Math.min(hdRecovered, c.hit_dice_used)}`, ok: c.hit_dice_used > 0 },
+          { label: 'Spell Slots', before: slotLevels > 0 ? `${slotLevels} level(s) used` : 'All available', after: 'All available', gained: 'Restored', ok: slotLevels > 0 },
+          { label: 'Death Saves', before: 'Cleared', after: 'Cleared', gained: '—', ok: false },
+          { label: 'Conditions', before: c.conditions.length > 0 ? c.conditions.join(', ') : 'None', after: 'None', gained: c.conditions.length > 0 ? 'Cleared' : '—', ok: c.conditions.length > 0 },
+        ].map((row, i, arr) => (
+          <div key={row.label} style={{ display: 'flex', alignItems: 'center', padding: '10px 14px', borderBottom: i < arr.length - 1 ? '1px solid var(--border)' : 'none' }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 13, fontWeight: 600 }}>{row.label}</div>
+              <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 1 }}>{row.before} → {row.after}</div>
+            </div>
+            <span style={{ fontSize: 12, fontWeight: 700, color: row.ok ? 'var(--green)' : 'var(--text3)' }}>{row.gained}</span>
+          </div>
+        ))}
       </div>
+
+      <button
+        onClick={doLongRest}
+        style={{ display: 'block', width: '100%', padding: 13, background: 'var(--teal)', color: '#fff', border: 'none', fontSize: 15, fontWeight: 600, cursor: 'pointer', borderRadius: 4, fontFamily: 'inherit' }}
+      >
+        Take Long Rest — 8 hours
+      </button>
     </div>
   )
 }

@@ -7,7 +7,7 @@ import { useUIStore } from '@/store/uiStore'
 import { useSessionStore } from '@/store/sessionStore'
 import { saveBonus } from '@/lib/calculations'
 import { haptic } from '@/utils/haptics'
-import HPSection, { ConditionsSheet, TempHPSheet, RestSheet } from '@/components/character/HPSection'
+import HPSection, { ConditionsSheet, TempHPSheet, ShortRestSheet, LongRestSheet } from '@/components/character/HPSection'
 import CombatStats from '@/components/character/CombatStats'
 import AbilityScores from '@/components/character/AbilityScores'
 import SavingThrows from '@/components/character/SavingThrows'
@@ -355,8 +355,11 @@ export default function CharacterSheetScreen() {
       <BottomSheet open={activeSheet === 'tempHp'} onClose={closeSheet} title="Temporary HP">
         <TempHPSheet character={c} />
       </BottomSheet>
-      <BottomSheet open={activeSheet === 'rest'} onClose={closeSheet} title="Take a Rest">
-        <RestSheet character={c} />
+      <BottomSheet open={activeSheet === 'shortRest'} onClose={closeSheet} title="Short Rest">
+        <ShortRestSheet character={c} />
+      </BottomSheet>
+      <BottomSheet open={activeSheet === 'longRest'} onClose={closeSheet} title="Long Rest">
+        <LongRestSheet character={c} />
       </BottomSheet>
       <BottomSheet open={activeSheet === 'info'} onClose={closeSheet} title="Character Info">
         <InfoSheet character={c} initialTab={infoInitialTab} />

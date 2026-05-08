@@ -161,7 +161,7 @@ export default function PlayerMenuScreen() {
     if (!result) {
       setJoinError('Session not found. Check the code and try again.')
     } else {
-      setSessionCode('')
+      navigate(`/characters/${selectedCharId}`)
     }
   }
 

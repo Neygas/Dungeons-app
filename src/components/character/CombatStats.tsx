@@ -94,14 +94,6 @@ export default function CombatStats({ character: c }: Props) {
     showToast(`${label} set to ${n}`)
   }
 
-  const useHitDie = async () => {
-    if (hdRem <= 0) { showToast('No hit dice remaining'); return }
-    const roll = Math.floor(Math.random() * hd) + 1
-    const gain = Math.max(0, roll + mod(c.con))
-    await patchActiveCharacter({ hp: Math.min(c.max_hp, c.hp + gain), hit_dice_used: c.hit_dice_used + 1 })
-    showToast(`Hit Die: rolled ${roll} + CON = +${gain} HP`)
-  }
-
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', border: '1px solid var(--border)', borderTop: 'none', background: 'var(--white)' }}>
       <div style={{ borderRight: '1px solid var(--border)', borderBottom: '1px solid var(--border)' }}>
@@ -120,7 +112,7 @@ export default function CombatStats({ character: c }: Props) {
         <StatCell label="Prof. Bonus" displayVal={'+' + pb} />
       </div>
       <div>
-        <StatCell label="Hit Dice" displayVal={`${hdRem}d${hd}`} editLabel={`total (/${c.hit_dice_total})`} editInitVal={c.hit_dice_total} dimmed={hdRem === 0} onTap={hdRem > 0 ? useHitDie : undefined} onCommit={v => { const n = Math.max(1, parseInt(v) || 1); patchActiveCharacter({ hit_dice_total: n }); showToast(`Hit dice total set to ${n}`) }} />
+        <StatCell label="Hit Dice" displayVal={`${hdRem}d${hd}`} editLabel={`total (/${c.hit_dice_total})`} editInitVal={c.hit_dice_total} dimmed={hdRem === 0} onCommit={v => { const n = Math.max(1, parseInt(v) || 1); patchActiveCharacter({ hit_dice_total: n }); showToast(`Hit dice total set to ${n}`) }} />
       </div>
     </div>
   )

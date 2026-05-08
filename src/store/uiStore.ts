@@ -16,7 +16,7 @@ interface Cutscene {
 interface UIState {
   toasts: Toast[]
   editMode: boolean
-  activeSheet: 'info' | 'exp' | 'quickref' | 'conditions' | 'tempHp' | 'rest' | null
+  activeSheet: 'info' | 'exp' | 'quickref' | 'conditions' | 'tempHp' | 'shortRest' | 'longRest' | null
   cutscene: Cutscene | null
 
   showToast: (message: string) => void
