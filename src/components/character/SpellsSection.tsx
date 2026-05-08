@@ -117,6 +117,7 @@ export default function SpellsSection({ character: c }: Props) {
       components: 'V, S',
       concentration: false,
       ritual: false,
+      higherLevel: null,
       classes: [c.class],
     }
     const already = (c.spells ?? []).some(s => s.name === customSpell.name)
@@ -144,6 +145,7 @@ export default function SpellsSection({ character: c }: Props) {
       components: 'V, S',
       concentration: false,
       ritual: false,
+      higherLevel: null,
       classes: [c.class],
     }
     await patchActiveCharacter({ spells: [...(c.spells ?? []), spell] })
