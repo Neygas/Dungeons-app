@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { Character } from '@/types'
 import type { Spell } from '@/types'
 import { CLASSES, SPELL_DB, SPELL_SLOTS_TABLE } from '@/data'
@@ -6,6 +6,7 @@ import { spellSaveDC, spellAttackBonus, fmtBonus } from '@/lib/calculations'
 import { useCharacterStore } from '@/store/characterStore'
 import { useSessionStore } from '@/store/sessionStore'
 import { useUIStore } from '@/store/uiStore'
+import { useCustomPlayerCatalogStore } from '@/store/customPlayerCatalogStore'
 import AddModal from '@/components/shared/AddModal'
 import SwipeToDelete from '@/components/shared/SwipeToDelete'
 
@@ -19,10 +20,21 @@ export default function SpellsSection({ character: c }: Props) {
   const { patchActiveCharacter } = useCharacterStore()
   const { logEntry, getJoinedSession } = useSessionStore()
   const { showToast } = useUIStore()
+  const { entries: catalogEntries, load: loadCatalog, save: saveToCatalog, remove: removeFromCatalog } = useCustomPlayerCatalogStore()
   const [openSpell, setOpenSpell] = useState<Spell | null>(null)
   const [showAddModal, setShowAddModal] = useState(false)
   const [dbQuery, setDbQuery] = useState('')
-  const [dbFilter, setDbFilter] = useState<number | 'all'>('all')
+  const [dbFilter, setDbFilter] = useState<number | 'all' | 'mine'>('all')
+  // Custom spell form
+  const [customSpellName, setCustomSpellName] = useState('')
+  const [customSpellLevel, setCustomSpellLevel] = useState(0)
+  const [customSpellSchool, setCustomSpellSchool] = useState('Evocation')
+  const [customSpellDesc, setCustomSpellDesc] = useState('')
+  const [customSpellDamage, setCustomSpellDamage] = useState('')
+
+  const mySpells = catalogEntries.filter(e => e.type === 'spell')
+
+  useEffect(() => { loadCatalog() }, [loadCatalog])
   const [preparedOnly, setPreparedOnly] = useState(false)
 
   const isPreparedCaster = PREPARED_CASTERS.includes(c.class)
@@ -56,10 +68,14 @@ export default function SpellsSection({ character: c }: Props) {
 
   const castSpell = async (spell: Spell, slotLevel?: number) => {
     const castLevel = slotLevel ?? spell.level
+    // Check if this is a custom spell so we can include its description in the log
+    const catalogEntry = mySpells.find(e => e.name === spell.name)
+    const customInfo = catalogEntry?.data.desc ? ` [Custom: ${catalogEntry.data.desc as string}]` : ''
+
     if (spell.level === 0) {
       showToast(`Cast ${spell.name}`)
       const sid = getJoinedSession(c.id)
-      if (sid) await logEntry(sid, c.name, 'spell_cast', `${c.name} cast ${spell.name} (cantrip)`, { spell: spell.name, level: 0 }, c.id)
+      if (sid) await logEntry(sid, c.name, 'spell_cast', `${c.name} cast ${spell.name} (cantrip)${customInfo}`, { spell: spell.name, level: 0 }, c.id)
       setOpenSpell(null)
       return
     }
@@ -83,8 +99,56 @@ export default function SpellsSection({ character: c }: Props) {
     }
     await patchActiveCharacter(updates)
     const sid = getJoinedSession(c.id)
-    if (sid) await logEntry(sid, c.name, 'spell_cast', `${c.name} cast ${spell.name} at level ${castLevel}`, { spell: spell.name, level: castLevel }, c.id)
+    if (sid) await logEntry(sid, c.name, 'spell_cast', `${c.name} cast ${spell.name} at level ${castLevel}${customInfo}`, { spell: spell.name, level: castLevel }, c.id)
     setOpenSpell(null)
+  }
+
+  const addCustomSpell = async () => {
+    if (!customSpellName.trim()) return
+    const customSpell: Spell = {
+      name: customSpellName.trim(),
+      level: customSpellLevel,
+      school: customSpellSchool,
+      desc: customSpellDesc.trim(),
+      damage: customSpellDamage.trim() || undefined,
+      castTime: '1 action',
+      range: 'Self',
+      duration: 'Instantaneous',
+      components: 'V, S',
+      concentration: false,
+      ritual: false,
+      classes: [c.class],
+    }
+    const already = (c.spells ?? []).some(s => s.name === customSpell.name)
+    if (!already) await patchActiveCharacter({ spells: [...(c.spells ?? []), customSpell] })
+    await saveToCatalog({ type: 'spell', name: customSpell.name, data: { level: customSpellLevel, school: customSpellSchool, desc: customSpellDesc.trim(), damage: customSpellDamage.trim() } })
+    showToast(`${customSpell.name} saved to My Spells`)
+    setCustomSpellName(''); setCustomSpellLevel(0); setCustomSpellSchool('Evocation'); setCustomSpellDesc(''); setCustomSpellDamage('')
+    setShowAddModal(false)
+  }
+
+  const addFromSpellCatalog = async (entryId: string) => {
+    const entry = mySpells.find(e => e.id === entryId)
+    if (!entry) return
+    const already = (c.spells ?? []).some(s => s.name === entry.name)
+    if (already) { showToast('Already known'); return }
+    const spell: Spell = {
+      name: entry.name,
+      level: (entry.data.level as number) ?? 0,
+      school: (entry.data.school as string) ?? 'Evocation',
+      desc: (entry.data.desc as string) ?? '',
+      damage: entry.data.damage as string | undefined,
+      castTime: '1 action',
+      range: 'Self',
+      duration: 'Instantaneous',
+      components: 'V, S',
+      concentration: false,
+      ritual: false,
+      classes: [c.class],
+    }
+    await patchActiveCharacter({ spells: [...(c.spells ?? []), spell] })
+    showToast(`${entry.name} added`)
+    setShowAddModal(false)
   }
 
   const stopConcentration = async () => {
@@ -111,6 +175,7 @@ export default function SpellsSection({ character: c }: Props) {
   })
 
   const dbSpells = SPELL_DB.filter(s => {
+    if (dbFilter === 'mine') return false
     const matchClass = !spellAb || s.classes.includes(c.class)
     const matchLevel = dbFilter === 'all' || s.level === dbFilter
     const matchQuery = !dbQuery || s.name.toLowerCase().includes(dbQuery.toLowerCase())
@@ -209,36 +274,91 @@ export default function SpellsSection({ character: c }: Props) {
       ))}
 
       {/* Add spell modal */}
-      <AddModal open={showAddModal} onClose={() => setShowAddModal(false)} title="Add Spell">
+      <AddModal open={showAddModal} onClose={() => { setShowAddModal(false); setDbFilter('all') }} title="Add Spell">
         <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, background: 'var(--white)', zIndex: 2 }}>
-          <input value={dbQuery} onChange={e => setDbQuery(e.target.value)} placeholder="Search spells..." style={{ width: '100%', border: '1px solid var(--border2)', padding: '9px 12px', fontSize: 15, fontFamily: 'inherit', color: 'var(--text)', borderRadius: 4, outline: 'none', background: 'var(--white)', boxSizing: 'border-box' }} />
+          {dbFilter !== 'mine'
+            ? <input value={dbQuery} onChange={e => setDbQuery(e.target.value)} placeholder="Search spells..." style={{ width: '100%', border: '1px solid var(--border2)', padding: '9px 12px', fontSize: 15, fontFamily: 'inherit', color: 'var(--text)', borderRadius: 4, outline: 'none', background: 'var(--white)', boxSizing: 'border-box' }} />
+            : <div style={{ fontSize: 14, fontWeight: 600, padding: '4px 0' }}>My Custom Spells</div>
+          }
         </div>
         <div style={{ display: 'flex', gap: 6, padding: '8px 14px', borderBottom: '1px solid var(--border)', flexWrap: 'wrap', position: 'sticky', top: 57, background: 'var(--white)', zIndex: 2 }}>
-          {['all', 0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(f => (
+          <button onClick={() => setDbFilter('mine')} style={{ padding: '4px 10px', border: '1px solid var(--border2)', background: dbFilter === 'mine' ? 'var(--teal)' : 'var(--white)', color: dbFilter === 'mine' ? '#fff' : 'var(--text2)', fontSize: 12, cursor: 'pointer', borderRadius: 3, fontFamily: 'inherit', fontWeight: 700 }}>Mine</button>
+          {(['all', 0, 1, 2, 3, 4, 5, 6, 7, 8, 9] as const).map(f => (
             <button key={String(f)} onClick={() => setDbFilter(f as typeof dbFilter)} style={{ padding: '4px 10px', border: '1px solid var(--border2)', background: dbFilter === f ? 'var(--purple)' : 'var(--white)', color: dbFilter === f ? '#fff' : 'var(--text2)', fontSize: 12, cursor: 'pointer', borderRadius: 3, fontFamily: 'inherit' }}>
               {f === 'all' ? 'All' : LEVEL_NAMES[Number(f)]}
             </button>
           ))}
         </div>
-        {dbSpells.length === 0 && (
-          <div style={{ padding: '24px 14px', textAlign: 'center', color: 'var(--text3)', fontSize: 14 }}>No spells found</div>
-        )}
-        {dbSpells.map(spell => {
-          const added = (c.spells ?? []).some(s => s.name === spell.name)
-          return (
-            <div key={spell.name} onClick={() => { if (!added) { addSpell(spell); setShowAddModal(false) } }} style={{ display: 'flex', alignItems: 'center', padding: '12px 14px', borderBottom: '1px solid var(--border)', cursor: added ? 'default' : 'pointer', background: 'var(--white)', opacity: added ? 0.45 : 1 }}
-              onMouseEnter={e => { if (!added) (e.currentTarget as HTMLElement).style.background = 'var(--purple-light)' }}
-              onMouseLeave={e => { if (!added) (e.currentTarget as HTMLElement).style.background = 'var(--white)' }}
-            >
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 15, fontWeight: 500 }}>{spell.name}</div>
-                <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 2 }}>{spell.school} · {spell.castTime}{spell.concentration ? ' · Conc.' : ''}{spell.ritual ? ' · Ritual' : ''}</div>
+
+        {/* Mine tab */}
+        {dbFilter === 'mine' && (
+          <div>
+            <div style={{ padding: '14px', borderBottom: '1px solid var(--border)', background: 'var(--bg)' }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 10 }}>Create new</div>
+              <input value={customSpellName} onChange={e => setCustomSpellName(e.target.value)} placeholder="Spell name" style={{ display: 'block', width: '100%', border: '1px solid var(--border2)', padding: '8px 10px', fontSize: 14, fontFamily: 'inherit', borderRadius: 3, outline: 'none', color: 'var(--text)', background: 'var(--white)', marginBottom: 8, boxSizing: 'border-box' }} />
+              <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)', marginBottom: 4 }}>Level</div>
+                  <select value={customSpellLevel} onChange={e => setCustomSpellLevel(Number(e.target.value))} style={{ width: '100%', border: '1px solid var(--border2)', padding: '8px 6px', fontSize: 14, fontFamily: 'inherit', borderRadius: 3, outline: 'none', color: 'var(--text)', background: 'var(--white)' }}>
+                    {[0,1,2,3,4,5,6,7,8,9].map(l => <option key={l} value={l}>{l === 0 ? 'Cantrip' : `Level ${l}`}</option>)}
+                  </select>
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)', marginBottom: 4 }}>School</div>
+                  <select value={customSpellSchool} onChange={e => setCustomSpellSchool(e.target.value)} style={{ width: '100%', border: '1px solid var(--border2)', padding: '8px 6px', fontSize: 14, fontFamily: 'inherit', borderRadius: 3, outline: 'none', color: 'var(--text)', background: 'var(--white)' }}>
+                    {['Abjuration','Conjuration','Divination','Enchantment','Evocation','Illusion','Necromancy','Transmutation'].map(s => <option key={s}>{s}</option>)}
+                  </select>
+                </div>
               </div>
-              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--purple)', marginRight: 12, minWidth: 44, textAlign: 'right' }}>{LEVEL_NAMES[spell.level]}</span>
-              <span style={{ fontSize: 13, color: added ? 'var(--text3)' : 'var(--purple)', fontWeight: 600, minWidth: 40, textAlign: 'right' }}>{added ? '✓' : '+ Add'}</span>
+              <input value={customSpellDamage} onChange={e => setCustomSpellDamage(e.target.value)} placeholder="Damage (e.g. 2d6 fire) — optional" style={{ display: 'block', width: '100%', border: '1px solid var(--border2)', padding: '8px 10px', fontSize: 14, fontFamily: 'inherit', borderRadius: 3, outline: 'none', color: 'var(--text)', background: 'var(--white)', marginBottom: 8, boxSizing: 'border-box' }} />
+              <textarea value={customSpellDesc} onChange={e => setCustomSpellDesc(e.target.value)} placeholder="Description / effect (shown in DM log when cast)" rows={3} style={{ display: 'block', width: '100%', border: '1px solid var(--border2)', padding: '8px 10px', fontSize: 14, fontFamily: 'inherit', borderRadius: 3, outline: 'none', color: 'var(--text)', background: 'var(--white)', marginBottom: 10, boxSizing: 'border-box', resize: 'vertical' }} />
+              <button onClick={addCustomSpell} disabled={!customSpellName.trim()} style={{ display: 'block', width: '100%', padding: 11, background: 'var(--teal)', color: '#fff', border: 'none', fontSize: 14, fontWeight: 600, cursor: 'pointer', borderRadius: 3, fontFamily: 'inherit', opacity: customSpellName.trim() ? 1 : 0.5 }}>Save & Add Spell</button>
             </div>
-          )
-        })}
+            {mySpells.length === 0 && <div style={{ padding: '24px 14px', textAlign: 'center', color: 'var(--text3)', fontSize: 14 }}>No custom spells saved yet.</div>}
+            {mySpells.map(entry => {
+              const added = (c.spells ?? []).some(s => s.name === entry.name)
+              return (
+                <div key={entry.id} style={{ display: 'flex', alignItems: 'center', padding: '12px 14px', borderBottom: '1px solid var(--border)', gap: 10, background: 'var(--white)' }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 15, fontWeight: 500 }}>{entry.name}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 2 }}>
+                      {LEVEL_NAMES[(entry.data.level as number) ?? 0]} · {entry.data.school as string}
+                      {entry.data.damage ? ` · ${entry.data.damage as string}` : ''}
+                    </div>
+                    {(entry.data.desc as string) && <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2, fontStyle: 'italic' }}>{entry.data.desc as string}</div>}
+                  </div>
+                  <button onClick={() => addFromSpellCatalog(entry.id)} disabled={added} style={{ padding: '5px 12px', border: '1px solid var(--teal)', background: added ? 'var(--bg)' : 'var(--teal-light)', color: added ? 'var(--text3)' : 'var(--teal2)', fontSize: 12, fontWeight: 600, cursor: added ? 'default' : 'pointer', borderRadius: 3, fontFamily: 'inherit', flexShrink: 0 }}>
+                    {added ? '✓ Added' : '+ Add'}
+                  </button>
+                  <button onClick={() => removeFromCatalog(entry.id)} style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', fontSize: 14, padding: '0 2px', fontFamily: 'inherit', flexShrink: 0 }}>✕</button>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {/* Standard DB */}
+        {dbFilter !== 'mine' && (
+          <>
+            {dbSpells.length === 0 && <div style={{ padding: '24px 14px', textAlign: 'center', color: 'var(--text3)', fontSize: 14 }}>No spells found</div>}
+            {dbSpells.map(spell => {
+              const added = (c.spells ?? []).some(s => s.name === spell.name)
+              return (
+                <div key={spell.name} onClick={() => { if (!added) { addSpell(spell); setShowAddModal(false) } }} style={{ display: 'flex', alignItems: 'center', padding: '12px 14px', borderBottom: '1px solid var(--border)', cursor: added ? 'default' : 'pointer', background: 'var(--white)', opacity: added ? 0.45 : 1 }}
+                  onMouseEnter={e => { if (!added) (e.currentTarget as HTMLElement).style.background = 'var(--purple-light)' }}
+                  onMouseLeave={e => { if (!added) (e.currentTarget as HTMLElement).style.background = 'var(--white)' }}
+                >
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 15, fontWeight: 500 }}>{spell.name}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 2 }}>{spell.school} · {spell.castTime}{spell.concentration ? ' · Conc.' : ''}{spell.ritual ? ' · Ritual' : ''}</div>
+                  </div>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--purple)', marginRight: 12, minWidth: 44, textAlign: 'right' }}>{LEVEL_NAMES[spell.level]}</span>
+                  <span style={{ fontSize: 13, color: added ? 'var(--text3)' : 'var(--purple)', fontWeight: 600, minWidth: 40, textAlign: 'right' }}>{added ? '✓' : '+ Add'}</span>
+                </div>
+              )
+            })}
+          </>
+        )}
       </AddModal>
 
       {/* Spell detail modal */}

@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { Character, InventoryItem } from '@/types'
 import { GEAR_DB, GEAR_CATEGORIES } from '@/data'
 import { useCharacterStore } from '@/store/characterStore'
 import { useUIStore } from '@/store/uiStore'
 import { useSessionStore } from '@/store/sessionStore'
+import { useCustomPlayerCatalogStore } from '@/store/customPlayerCatalogStore'
 import { haptic } from '@/utils/haptics'
 import AddModal from '@/components/shared/AddModal'
 import SwipeToDelete from '@/components/shared/SwipeToDelete'
@@ -54,14 +55,23 @@ export default function InventorySection({ character: c }: Props) {
   const { patchActiveCharacter } = useCharacterStore()
   const { showToast } = useUIStore()
   const { logEntry, getJoinedSession } = useSessionStore()
+  const { entries: catalogEntries, load: loadCatalog, save: saveToCatalog, remove: removeFromCatalog } = useCustomPlayerCatalogStore()
+
   const [showAddModal, setShowAddModal] = useState(false)
   const [dbFilter, setDbFilter] = useState('All')
   const [dbQuery, setDbQuery] = useState('')
+  // Custom item form
   const [customName, setCustomName] = useState('')
-  const [showCustom, setShowCustom] = useState(false)
+  const [customDesc, setCustomDesc] = useState('')
+  const [customCost, setCustomCost] = useState('')
   // Item use state
   const [useItem, setUseItem] = useState<InventoryItem | null>(null)
   const [useQty, setUseQty] = useState('1')
+
+  const myItems = catalogEntries.filter(e => e.type === 'item')
+  const showMine = dbFilter === 'Mine'
+
+  useEffect(() => { loadCatalog() }, [loadCatalog])
 
   const adjustQty = async (name: string, delta: number) => {
     const next = (c.inventory ?? []).map(item =>
@@ -84,11 +94,31 @@ export default function InventorySection({ character: c }: Props) {
 
   const addCustom = async () => {
     if (!customName.trim()) return
-    const existing = (c.inventory ?? []).find(i => i.name === customName.trim())
-    if (existing) { await adjustQty(customName.trim(), 1) }
-    else { await patchActiveCharacter({ inventory: [...(c.inventory ?? []), { name: customName.trim(), quantity: 1 }] }) }
-    showToast(`${customName.trim()} added`)
-    setCustomName(''); setShowCustom(false); setShowAddModal(false)
+    const name = customName.trim()
+    const existing = (c.inventory ?? []).find(i => i.name === name)
+    if (existing) {
+      await adjustQty(name, 1)
+    } else {
+      await patchActiveCharacter({ inventory: [...(c.inventory ?? []), { name, quantity: 1, desc: customDesc.trim() || undefined, cost: customCost.trim() || undefined }] })
+    }
+    // Save to account catalog
+    await saveToCatalog({ type: 'item', name, data: { desc: customDesc.trim(), cost: customCost.trim() } })
+    showToast(`${name} saved to My Items`)
+    setCustomName(''); setCustomDesc(''); setCustomCost('')
+    setShowAddModal(false)
+  }
+
+  const addFromCatalog = async (entryId: string) => {
+    const entry = myItems.find(e => e.id === entryId)
+    if (!entry) return
+    const existing = (c.inventory ?? []).find(i => i.name === entry.name)
+    if (existing) {
+      await adjustQty(entry.name, 1)
+    } else {
+      await patchActiveCharacter({ inventory: [...(c.inventory ?? []), { name: entry.name, quantity: 1, desc: entry.data.desc as string | undefined, cost: entry.data.cost as string | undefined }] })
+    }
+    showToast(`${entry.name} added`)
+    setShowAddModal(false)
   }
 
   const confirmUseItem = async () => {
@@ -98,7 +128,10 @@ export default function InventorySection({ character: c }: Props) {
     haptic.itemUse()
     await adjustQty(useItem.name, -clamped)
     const sid = getJoinedSession(c.id)
-    if (sid) await logEntry(sid, c.name, 'item_use', `${c.name} used ${clamped}× ${useItem.name}`, { quantity: clamped }, c.id)
+    if (sid) {
+      const descInfo = useItem.desc ? ` (${useItem.desc})` : ''
+      await logEntry(sid, c.name, 'item_use', `${c.name} used ${clamped}× ${useItem.name}${descInfo}`, { quantity: clamped }, c.id)
+    }
     showToast(`Used ${clamped}× ${useItem.name}`)
     setUseItem(null)
     setUseQty('1')
@@ -132,7 +165,8 @@ export default function InventorySection({ character: c }: Props) {
           <div style={{ display: 'flex', alignItems: 'center', padding: '9px 14px', border: '1px solid var(--border)', borderTop: 'none', background: 'var(--white)', gap: 10 }}>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 14 }}>{item.name}</div>
-              {item.cost && <div style={{ fontSize: 11, color: 'var(--text3)' }}>{item.cost}</div>}
+              {item.desc && <div style={{ fontSize: 11, color: 'var(--text3)' }}>{item.desc}</div>}
+              {item.cost && !item.desc && <div style={{ fontSize: 11, color: 'var(--text3)' }}>{item.cost}</div>}
             </div>
             <button
               onClick={() => { setUseItem(item); setUseQty('1') }}
@@ -154,6 +188,7 @@ export default function InventorySection({ character: c }: Props) {
         <div onClick={e => { if (e.target === e.currentTarget) setUseItem(null) }} className="modal-backdrop" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
           <div className="modal-panel" style={{ background: 'var(--white)', borderRadius: 10, width: '100%', maxWidth: 320, padding: 20 }}>
             <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>Use {useItem.name}</div>
+            {useItem.desc && <div style={{ fontSize: 13, color: 'var(--teal2)', background: 'var(--teal-light)', padding: '6px 10px', borderRadius: 4, marginBottom: 10 }}>{useItem.desc}</div>}
             <div style={{ fontSize: 13, color: 'var(--text3)', marginBottom: 16 }}>You have {useItem.quantity}. How many do you want to use?</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
               <button onClick={() => setUseQty(q => String(Math.max(1, (parseInt(q) || 1) - 1)))} style={{ width: 36, height: 36, border: '1px solid var(--border2)', background: 'var(--white)', cursor: 'pointer', fontSize: 18, borderRadius: 2, fontFamily: 'inherit' }}>−</button>
@@ -169,48 +204,72 @@ export default function InventorySection({ character: c }: Props) {
       )}
 
       {/* Add item modal */}
-      <AddModal open={showAddModal} onClose={() => { setShowAddModal(false); setShowCustom(false) }} title="Add Item">
+      <AddModal open={showAddModal} onClose={() => { setShowAddModal(false); setDbFilter('All') }} title="Add Item">
         <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, background: 'var(--white)', zIndex: 2 }}>
-          <input value={dbQuery} onChange={e => setDbQuery(e.target.value)} placeholder="Search items..." style={{ width: '100%', border: '1px solid var(--border2)', padding: '9px 12px', fontSize: 15, fontFamily: 'inherit', color: 'var(--text)', borderRadius: 4, outline: 'none', background: 'var(--white)', boxSizing: 'border-box' }} />
+          {!showMine && <input value={dbQuery} onChange={e => setDbQuery(e.target.value)} placeholder="Search items..." style={{ width: '100%', border: '1px solid var(--border2)', padding: '9px 12px', fontSize: 15, fontFamily: 'inherit', color: 'var(--text)', borderRadius: 4, outline: 'none', background: 'var(--white)', boxSizing: 'border-box' }} />}
+          {showMine && <div style={{ fontSize: 14, fontWeight: 600, padding: '4px 0' }}>My Custom Items</div>}
         </div>
         <div style={{ display: 'flex', gap: 6, padding: '8px 14px', borderBottom: '1px solid var(--border)', flexWrap: 'wrap', position: 'sticky', top: 57, background: 'var(--white)', zIndex: 2 }}>
-          {['All', ...GEAR_CATEGORIES].map(cat => (
-            <button key={cat} onClick={() => setDbFilter(cat)} style={{ padding: '4px 8px', border: '1px solid var(--border2)', background: dbFilter === cat ? 'var(--purple)' : 'var(--white)', color: dbFilter === cat ? '#fff' : 'var(--text2)', fontSize: 11, cursor: 'pointer', borderRadius: 3, fontFamily: 'inherit' }}>
+          {['Mine', 'All', ...GEAR_CATEGORIES].map(cat => (
+            <button key={cat} onClick={() => setDbFilter(cat)} style={{ padding: '4px 8px', border: '1px solid var(--border2)', background: dbFilter === cat ? (cat === 'Mine' ? 'var(--teal)' : 'var(--purple)') : 'var(--white)', color: dbFilter === cat ? '#fff' : 'var(--text2)', fontSize: 11, cursor: 'pointer', borderRadius: 3, fontFamily: 'inherit', fontWeight: cat === 'Mine' ? 700 : 400 }}>
               {cat}
             </button>
           ))}
         </div>
 
-        {filteredDB.length === 0 && (
-          <div style={{ padding: '24px 14px', textAlign: 'center', color: 'var(--text3)', fontSize: 14 }}>No items found</div>
+        {/* Mine tab */}
+        {showMine && (
+          <div>
+            <div style={{ padding: '14px', borderBottom: '1px solid var(--border)', background: 'var(--bg)' }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 10 }}>Create new</div>
+              <input value={customName} onChange={e => setCustomName(e.target.value)} placeholder="Item name" style={{ display: 'block', width: '100%', border: '1px solid var(--border2)', padding: '8px 10px', fontSize: 14, fontFamily: 'inherit', borderRadius: 3, outline: 'none', color: 'var(--text)', background: 'var(--white)', marginBottom: 8, boxSizing: 'border-box' }} />
+              <input value={customDesc} onChange={e => setCustomDesc(e.target.value)} placeholder="Description (shown in DM log when used)" style={{ display: 'block', width: '100%', border: '1px solid var(--border2)', padding: '8px 10px', fontSize: 14, fontFamily: 'inherit', borderRadius: 3, outline: 'none', color: 'var(--text)', background: 'var(--white)', marginBottom: 8, boxSizing: 'border-box' }} />
+              <input value={customCost} onChange={e => setCustomCost(e.target.value)} placeholder="Cost (optional, e.g. 10 gp)" style={{ display: 'block', width: '100%', border: '1px solid var(--border2)', padding: '8px 10px', fontSize: 14, fontFamily: 'inherit', borderRadius: 3, outline: 'none', color: 'var(--text)', background: 'var(--white)', marginBottom: 10, boxSizing: 'border-box' }} />
+              <button onClick={addCustom} disabled={!customName.trim()} style={{ display: 'block', width: '100%', padding: 11, background: 'var(--teal)', color: '#fff', border: 'none', fontSize: 14, fontWeight: 600, cursor: 'pointer', borderRadius: 3, fontFamily: 'inherit', opacity: customName.trim() ? 1 : 0.5 }}>Save & Add to Inventory</button>
+            </div>
+            {myItems.length === 0 && <div style={{ padding: '24px 14px', textAlign: 'center', color: 'var(--text3)', fontSize: 14 }}>No custom items saved yet.</div>}
+            {myItems.map(entry => {
+              const existing = (c.inventory ?? []).find(i => i.name === entry.name)
+              return (
+                <div key={entry.id} style={{ display: 'flex', alignItems: 'center', padding: '12px 14px', borderBottom: '1px solid var(--border)', gap: 10, background: 'var(--white)' }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 15, fontWeight: 500 }}>{entry.name}</div>
+                    {(entry.data.desc as string) && <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 2 }}>{entry.data.desc as string}</div>}
+                    {(entry.data.cost as string) && <div style={{ fontSize: 11, color: 'var(--text3)' }}>{entry.data.cost as string}</div>}
+                  </div>
+                  {existing && <span style={{ fontSize: 12, color: 'var(--text3)', marginRight: 4 }}>×{existing.quantity}</span>}
+                  <button onClick={() => addFromCatalog(entry.id)} style={{ padding: '5px 12px', border: '1px solid var(--teal)', background: 'var(--teal-light)', color: 'var(--teal2)', fontSize: 12, fontWeight: 600, cursor: 'pointer', borderRadius: 3, fontFamily: 'inherit', flexShrink: 0 }}>
+                    + Add
+                  </button>
+                  <button onClick={() => removeFromCatalog(entry.id)} style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', fontSize: 14, padding: '0 2px', fontFamily: 'inherit', flexShrink: 0 }}>✕</button>
+                </div>
+              )
+            })}
+          </div>
         )}
-        {filteredDB.map(g => {
-          const existing = (c.inventory ?? []).find(i => i.name === g.name)
-          return (
-            <div key={g.name} onClick={() => { addFromDB(g.name) }} style={{ display: 'flex', alignItems: 'center', padding: '12px 14px', borderBottom: '1px solid var(--border)', cursor: 'pointer', background: 'var(--white)' }}
-              onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--purple-light)'}
-              onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'var(--white)'}
-            >
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 15, fontWeight: 500 }}>{g.name}</div>
-                <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 2 }}>{g.cost} · {g.category}</div>
-              </div>
-              {existing && <span style={{ fontSize: 12, color: 'var(--text3)', marginRight: 10 }}>×{existing.quantity}</span>}
-              <span style={{ fontSize: 13, color: 'var(--purple)', fontWeight: 600, minWidth: 40, textAlign: 'right' }}>+ Add</span>
-            </div>
-          )
-        })}
 
-        {/* Custom item */}
-        <div style={{ padding: '14px' }}>
-          <button onClick={() => setShowCustom(!showCustom)} style={{ fontSize: 14, color: 'var(--purple)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}>+ Custom item</button>
-          {showCustom && (
-            <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-              <input value={customName} onChange={e => setCustomName(e.target.value)} onKeyDown={e => e.key === 'Enter' && addCustom()} placeholder="Item name" style={{ flex: 1, border: '1px solid var(--border2)', padding: '8px 10px', fontSize: 14, fontFamily: 'inherit', borderRadius: 3, outline: 'none', color: 'var(--text)', background: 'var(--white)' }} />
-              <button onClick={addCustom} disabled={!customName.trim()} style={{ padding: '8px 16px', background: 'var(--teal)', color: '#fff', border: 'none', fontSize: 14, fontWeight: 600, cursor: 'pointer', borderRadius: 3, fontFamily: 'inherit', opacity: customName.trim() ? 1 : 0.5 }}>Add</button>
-            </div>
-          )}
-        </div>
+        {/* Standard DB */}
+        {!showMine && (
+          <>
+            {filteredDB.length === 0 && <div style={{ padding: '24px 14px', textAlign: 'center', color: 'var(--text3)', fontSize: 14 }}>No items found</div>}
+            {filteredDB.map(g => {
+              const existing = (c.inventory ?? []).find(i => i.name === g.name)
+              return (
+                <div key={g.name} onClick={() => { addFromDB(g.name) }} style={{ display: 'flex', alignItems: 'center', padding: '12px 14px', borderBottom: '1px solid var(--border)', cursor: 'pointer', background: 'var(--white)' }}
+                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--purple-light)'}
+                  onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'var(--white)'}
+                >
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 15, fontWeight: 500 }}>{g.name}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 2 }}>{g.cost} · {g.category}</div>
+                  </div>
+                  {existing && <span style={{ fontSize: 12, color: 'var(--text3)', marginRight: 10 }}>×{existing.quantity}</span>}
+                  <span style={{ fontSize: 13, color: 'var(--purple)', fontWeight: 600, minWidth: 40, textAlign: 'right' }}>+ Add</span>
+                </div>
+              )
+            })}
+          </>
+        )}
       </AddModal>
 
       {/* Currency */}

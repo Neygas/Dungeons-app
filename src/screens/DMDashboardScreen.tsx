@@ -5,6 +5,7 @@ import { useUIStore } from '@/store/uiStore'
 import { useCustomCreatureStore } from '@/store/customCreatureStore'
 import { useCustomEncounterStore } from '@/store/customEncounterStore'
 import { useLootTemplateStore } from '@/store/lootTemplateStore'
+import { useShopTemplateStore } from '@/store/shopTemplateStore'
 import { haptic } from '@/utils/haptics'
 import { CONDITIONS } from '@/data/conditions'
 import { GEAR_DB, GEAR_CATEGORIES } from '@/data/gear'
@@ -474,6 +475,7 @@ export default function DMDashboardScreen() {
   const { creatures: customCreatures, load: loadCustomCreatures, save: saveCustomCreature, remove: removeCustomCreature } = useCustomCreatureStore()
   const { encounters: customEncounters, load: loadCustomEncounters, save: saveCustomEncounter, remove: removeCustomEncounter } = useCustomEncounterStore()
   const { templates: savedTemplates, load: loadLootTemplates, save: saveLootTemplate, remove: removeLootTemplate } = useLootTemplateStore()
+  const { templates: savedShopTemplates, load: loadShopTemplates, save: saveShopTemplate, remove: removeShopTemplate } = useShopTemplateStore()
 
   const [tab, setTab] = useState<Tab>('players')
   const [detailChar, setDetailChar] = useState<Character | null>(null)
@@ -523,6 +525,8 @@ export default function DMDashboardScreen() {
   const [shopPickerOpen, setShopPickerOpen] = useState(false)
   const [shopPickerSearch, setShopPickerSearch] = useState('')
   const [shopPickerCat, setShopPickerCat] = useState('All')
+  const [showSaveShopTemplate, setShowSaveShopTemplate] = useState(false)
+  const [saveShopTemplateName, setSaveShopTemplateName] = useState('')
 
   // New feature state
   const [showAddCreature, setShowAddCreature] = useState(false)
@@ -540,6 +544,7 @@ export default function DMDashboardScreen() {
     loadCustomCreatures()
     loadCustomEncounters()
     loadLootTemplates()
+    loadShopTemplates()
     return () => { unsubscribeAll() }
   }, [sessionId]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -797,6 +802,18 @@ export default function DMDashboardScreen() {
 
   const deleteSavedTemplate = async (id: string) => {
     await removeLootTemplate(id)
+  }
+
+  const saveCurrentShopAsTemplate = async () => {
+    if (!saveShopTemplateName.trim()) return
+    await saveShopTemplate({ name: saveShopTemplateName.trim(), items: s.shop_items ?? [] })
+    setSaveShopTemplateName('')
+    setShowSaveShopTemplate(false)
+  }
+
+  const loadShopTemplate = (template: { name: string; items: ShopItem[] }) => {
+    const withUniqueIds = template.items.map(item => ({ ...item, id: `shop-${Date.now()}-${Math.random()}` }))
+    patchSession({ shop_items: withUniqueIds })
   }
 
   // ── Shop handlers ────────────────────────────────────────────────────────────
@@ -1486,6 +1503,21 @@ export default function DMDashboardScreen() {
             </div>
           </div>
 
+          {/* Saved shop templates */}
+          {savedShopTemplates.length > 0 && (
+            <div style={{ background: 'var(--white)', border: '1px solid var(--border)', borderTop: 'none', padding: '10px 14px' }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 8 }}>Saved Shop Templates</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {savedShopTemplates.map(tmpl => (
+                  <div key={tmpl.id} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 8px', border: '1px solid var(--border2)', borderRadius: 3, background: 'var(--bg)' }}>
+                    <span onClick={() => loadShopTemplate(tmpl)} style={{ fontSize: 12, cursor: 'pointer', color: 'var(--teal2)', fontWeight: 600 }}>{tmpl.name}</span>
+                    <button onClick={() => removeShopTemplate(tmpl.id)} style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', fontSize: 12, padding: 0, lineHeight: 1, fontFamily: 'inherit' }}>✕</button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {(s.shop_items ?? []).length === 0 && (
             <div style={{ background: 'var(--white)', border: '1px solid var(--border)', borderTop: 'none', padding: '16px 14px', textAlign: 'center', color: 'var(--text3)', fontSize: 13 }}>No items in shop.</div>
           )}
@@ -1499,6 +1531,30 @@ export default function DMDashboardScreen() {
               <button onClick={() => removeShopItem(item.id)} style={{ background: 'none', border: 'none', color: 'var(--red)', cursor: 'pointer', fontSize: 14, padding: '0 2px', fontFamily: 'inherit' }}>✕</button>
             </div>
           ))}
+
+          {/* Save current shop as template */}
+          {(s.shop_items ?? []).length > 0 && (
+            <div style={{ background: 'var(--white)', border: '1px solid var(--border)', borderTop: 'none', padding: '8px 14px' }}>
+              {!showSaveShopTemplate ? (
+                <button onClick={() => setShowSaveShopTemplate(true)} style={{ fontSize: 12, color: 'var(--teal2)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}>
+                  Save current shop as template →
+                </button>
+              ) : (
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <input
+                    autoFocus
+                    value={saveShopTemplateName}
+                    onChange={e => setSaveShopTemplateName(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && saveCurrentShopAsTemplate()}
+                    placeholder="Shop template name"
+                    style={{ flex: 1, border: 'none', borderBottom: '1px solid var(--border2)', background: 'transparent', fontSize: 13, fontFamily: 'inherit', outline: 'none', padding: '4px 2px' }}
+                  />
+                  <button onClick={saveCurrentShopAsTemplate} disabled={!saveShopTemplateName.trim()} style={{ padding: '4px 12px', background: 'var(--teal)', color: '#fff', border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer', borderRadius: 2, fontFamily: 'inherit', opacity: saveShopTemplateName.trim() ? 1 : 0.5 }}>Save</button>
+                  <button onClick={() => { setShowSaveShopTemplate(false); setSaveShopTemplateName('') }} style={{ padding: '4px 8px', background: 'none', border: '1px solid var(--border2)', fontSize: 12, cursor: 'pointer', borderRadius: 2, fontFamily: 'inherit', color: 'var(--text2)' }}>✕</button>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Custom shop item */}
           <div style={{ background: 'var(--white)', border: '1px solid var(--border)', borderTop: 'none', padding: '12px 14px' }}>
