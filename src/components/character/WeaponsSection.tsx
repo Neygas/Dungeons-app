@@ -181,6 +181,7 @@ export default function WeaponsSection({ character: c }: Props) {
         const ammoName = getAmmoName(activeWeapon)
         const ammoCount = ammoName ? getAmmoCount(ammoName) : 0
         const catalogEntry = myWeapons.find(e => e.name === activeWeapon)
+        const catalogNotes = catalogEntry?.data.notes ? String(catalogEntry.data.notes) : ''
 
         return (
           <div style={{ background: 'var(--teal-light)', border: '1px solid var(--teal)', borderTop: 'none', padding: '12px 14px' }}>
@@ -192,7 +193,7 @@ export default function WeaponsSection({ character: c }: Props) {
                   {customW && <span style={{ fontSize: 10, background: 'rgba(0,0,0,.08)', color: 'var(--teal2)', padding: '1px 5px', borderRadius: 3, fontWeight: 600 }}>CUSTOM</span>}
                 </div>
                 <div style={{ fontSize: 13, color: 'var(--text2)', marginTop: 2 }}>{dmgStr}</div>
-                {catalogEntry?.data.notes && <div style={{ fontSize: 12, color: 'var(--teal2)', marginTop: 2, fontStyle: 'italic' }}>{String(catalogEntry.data.notes)}</div>}
+                {catalogNotes && <div style={{ fontSize: 12, color: 'var(--teal2)', marginTop: 2, fontStyle: 'italic' }}>{catalogNotes}</div>}
               </div>
               {dbW && <div style={{ textAlign: 'right' }}>
                 <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--teal2)' }}>{fmtBonus(atk)}</div>
